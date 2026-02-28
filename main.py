@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 from pipeline import run_pipeline
 import os, uuid
 
+from dotenv import load_dotenv
 load_dotenv()
+
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+ssl.create_default_context = ssl._create_unverified_context
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
