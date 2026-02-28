@@ -17,13 +17,17 @@ def generate_instrumental(style_prompt: str, bpm: int = 120, output_path: str = 
 
             total_samples = 0
             target_samples = 48000 * 60  # 60 seconds at 48kHz
+            print(f"Target samples: {target_samples}")
             async for message in session.receive():
                 if message.server_content and message.server_content.audio_chunks:
                     for chunk in message.server_content.audio_chunks:
                         audio_chunks.append(chunk.data)
                         total_samples += len(chunk.data) // 4
+                    print(f"Received chunk. Total samples: {total_samples}/{target_samples}")
                 if total_samples >= target_samples:
+                    print("Reached target samples!")
                     break
+            print("Exited async for loop")
 
     loop = asyncio.new_event_loop()
     try:
