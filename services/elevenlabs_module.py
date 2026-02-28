@@ -11,6 +11,18 @@ def _get_client():
     return _client
 
 
+def synthesize_vocals(lyrics: str, output_path: str = "temp/vocals.mp3") -> str:
+    audio = _get_client().text_to_speech.convert(
+        voice_id="21m00Tcm4TlvDq8ikWAM",
+        text=lyrics,
+        model_id="eleven_multilingual_v2",
+    )
+    with open(output_path, "wb") as f:
+        for chunk in audio:
+            f.write(chunk)
+    return output_path
+
+
 def convert_speech_to_speech(audio_path: str, output_path: str = "temp/vocals.mp3") -> str:
     with open(audio_path, "rb") as audio_file:
         audio = _get_client().speech_to_speech.convert(

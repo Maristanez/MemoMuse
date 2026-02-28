@@ -19,9 +19,12 @@ A musician recorded a rough voice memo. Transcription:
 
 Genre: {genre}
 
+First, determine if the transcript contains actual sung lyrics or is mostly humming/vocalizing (e.g. "hmm", "la la la", "na na", "doo doo", or empty/nonsensical text). Set contains_lyrics to false if it's humming/vocalizing, true if there are real words being sung.
+
 Respond with ONLY valid JSON (no markdown):
 
 {{
+  "contains_lyrics": true,
   "cleaned_lyrics": "polished singable version (1 verse + chorus max, short for 30s track)",
   "style_prompt": "detailed Lyria music prompt (genre, tempo BPM, mood, instruments, energy)",
   "detected_genre": "refined genre suggestion",

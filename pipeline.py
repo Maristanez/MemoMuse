@@ -1,7 +1,7 @@
 import os, asyncio, uuid
 from pydub import AudioSegment
 from services.gemini_module import get_gemini_analysis
-from services.elevenlabs_module import convert_speech_to_speech
+from services.elevenlabs_module import convert_speech_to_speech, synthesize_vocals
 from services.lyria_module import generate_instrumental
 from services.transcribe_module import transcribe_audio
 from services.backboard_module import store_session
@@ -26,7 +26,8 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
     bpm = gemini_result.get("bpm", 120)
     if isinstance(bpm, str):
         bpm = int("".join(c for c in bpm if c.isdigit()) or "120")
-    print(f"[2/6] Gemini: mood={mood}, bpm={bpm}")
+    contains_lyrics = gemini_result.get("contains_lyrics", True)
+    print(f"[2/6] Gemini: mood={mood}, bpm={bpm}, contains_lyrics={contains_lyrics}")
 
     # Step 3: Backboard.io session memory (optional)
     try:
@@ -50,9 +51,14 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
     instrumental_task = asyncio.create_task(
         asyncio.to_thread(generate_instrumental, style_prompt, bpm, inst_path)
     )
-    vocal_task = asyncio.create_task(
-        asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
-    )
+    if contains_lyrics:
+        vocal_task = asyncio.create_task(
+            asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path)
+        )
+    else:
+        vocal_task = asyncio.create_task(
+            asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
+        )
     inst_path = await instrumental_task
     vocal_path = await vocal_task
     print("[5/6] Audio generated")
