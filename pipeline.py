@@ -1,11 +1,11 @@
 import os, asyncio
 from pydub import AudioSegment
-from gemini_module import get_gemini_analysis
-from elevenlabs_module import synthesize_vocals
-from lyria_module import generate_instrumental
-from transcribe_module import transcribe_audio
-from backboard_module import store_session
-from featherless_module import refine_lyrics
+from services.gemini_module import get_gemini_analysis
+from services.elevenlabs_module import synthesize_vocals
+from services.lyria_module import generate_instrumental
+from services.transcribe_module import transcribe_audio
+from services.backboard_module import store_session
+from services.featherless_module import refine_lyrics
 
 VOCAL_REDUCTION_DB = 3
 
