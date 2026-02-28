@@ -19,12 +19,12 @@ def _side_effect_instrumental(style_prompt, bpm, output_path):
     return output_path
 
 
-def _side_effect_tts(lyrics, output_path):
+def _side_effect_tts(lyrics, output_path, voice_id=None, voice_stability=0.3, voice_similarity=0.75, voice_style=0.45):
     _make_dummy_audio(output_path)
     return output_path
 
 
-def _side_effect_sts(audio_path, output_path):
+def _side_effect_sts(audio_path, output_path, voice_id=None):
     _make_dummy_audio(output_path)
     return output_path
 
