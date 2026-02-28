@@ -12,23 +12,35 @@ def _get_client():
 
 
 def get_gemini_analysis(raw_transcript: str, genre: str) -> dict:
-    prompt = f"""You are a music producer AI assistant.
+    prompt = f"""You are a professional music producer and songwriter.
 
 A musician recorded a rough voice memo. Transcription:
 "{raw_transcript}"
 
-Genre: {genre}
+Target genre: {genre}
 
-First, determine if the transcript contains actual sung lyrics or is mostly humming/vocalizing (e.g. "hmm", "la la la", "na na", "doo doo", or empty/nonsensical text). Set contains_lyrics to false if it's humming/vocalizing, true if there are real words being sung.
+First, determine if the transcript contains actual sung/spoken lyrics or is mostly humming/vocalizing (e.g. "hmm", "la la la", "na na", "doo doo", or empty/nonsensical text). Set contains_lyrics to false if it's humming/vocalizing, true if there are real words.
+
+If contains_lyrics is true:
+- Take their raw idea and turn it into FULL, polished, singable song lyrics.
+- Expand the idea — add emotion, imagery, storytelling. Make it feel like a real song.
+- Structure: Verse 1 (4-6 lines) → Chorus (4 lines) → Verse 2 (4-6 lines) → Chorus (4 lines).
+- Keep the original message/feeling but elevate the language to fit the genre.
+
+If contains_lyrics is false:
+- Write original lyrics inspired by the mood/energy of their humming.
+- Same structure: Verse 1 → Chorus → Verse 2 → Chorus.
+
+Always create a detailed music production prompt for instrumental generation.
 
 Respond with ONLY valid JSON (no markdown):
 
 {{
   "contains_lyrics": true,
-  "cleaned_lyrics": "polished singable version (1 verse + chorus max, short for 30s track)",
-  "style_prompt": "detailed Lyria music prompt (genre, tempo BPM, mood, instruments, energy)",
-  "detected_genre": "refined genre suggestion",
-  "mood": "one word (e.g. melancholic, upbeat, nostalgic)",
+  "cleaned_lyrics": "Full structured lyrics with [Verse 1], [Chorus], [Verse 2], [Chorus] labels. 16-24 lines total.",
+  "style_prompt": "Detailed music production prompt: genre, exact BPM, mood, key, instruments (list specific ones), energy arc, production style. Be very specific.",
+  "detected_genre": "refined genre",
+  "mood": "one or two words",
   "bpm": 120,
   "key": "C minor"
 }}"""

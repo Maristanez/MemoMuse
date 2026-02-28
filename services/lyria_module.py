@@ -16,7 +16,7 @@ def generate_instrumental(style_prompt: str, bpm: int = 120, output_path: str = 
             await session.play()
 
             total_samples = 0
-            target_samples = 48000 * 30  # 30 seconds at 48kHz
+            target_samples = 48000 * 60  # 60 seconds at 48kHz
             async for message in session.receive():
                 if message.server_content and message.server_content.audio_chunks:
                     for chunk in message.server_content.audio_chunks:

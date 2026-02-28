@@ -7,18 +7,18 @@ from services.transcribe_module import transcribe_audio
 from services.backboard_module import store_session
 from services.featherless_module import refine_lyrics
 
-VOCAL_REDUCTION_DB = 3
+VOCAL_REDUCTION_DB = 1
 
 
 async def run_pipeline(input_path: str, genre: str) -> dict:
     os.makedirs("temp", exist_ok=True)
     run_id = uuid.uuid4().hex[:8]
 
-    # Step 1: Transcribe (CPU-bound — run in thread to avoid blocking event loop)
+    # Step 1: Transcribe
     raw_transcript = await asyncio.to_thread(transcribe_audio, input_path)
     print(f"[1/6] Transcription: {raw_transcript[:100]}...")
 
-    # Step 2: Gemini analysis (network I/O — run in thread)
+    # Step 2: Gemini analysis — full lyrics + style prompt + humming detection
     gemini_result = await asyncio.to_thread(get_gemini_analysis, raw_transcript, genre)
     cleaned_lyrics = gemini_result["cleaned_lyrics"]
     style_prompt = gemini_result["style_prompt"]
@@ -28,6 +28,7 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
         bpm = int("".join(c for c in bpm if c.isdigit()) or "120")
     contains_lyrics = gemini_result.get("contains_lyrics", True)
     print(f"[2/6] Gemini: mood={mood}, bpm={bpm}, contains_lyrics={contains_lyrics}")
+    print(f"      Lyrics preview: {cleaned_lyrics[:120]}...")
 
     # Step 3: Backboard.io session memory (optional)
     try:
@@ -46,6 +47,8 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
         print(f"[4/6] Featherless skipped: {e}")
 
     # Step 5: Parallel generation — instrumental + vocals
+    # If user sang lyrics → TTS with expanded lyrics
+    # If user hummed → STS to preserve their melody
     inst_path = f"temp/instrumental_{run_id}.wav"
     vocal_path = f"temp/vocals_{run_id}.mp3"
     instrumental_task = asyncio.create_task(
@@ -55,26 +58,29 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
         vocal_task = asyncio.create_task(
             asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path)
         )
+        print("      → Using TTS with generated lyrics")
     else:
         vocal_task = asyncio.create_task(
             asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
         )
+        print("      → Using STS to preserve hummed melody")
     inst_path = await instrumental_task
     vocal_path = await vocal_task
     print("[5/6] Audio generated")
 
-    # Step 6: Mix
+    # Step 6: Mix — layer vocals over instrumental
     instrumental = AudioSegment.from_file(inst_path)
     vocal = AudioSegment.from_file(vocal_path) - VOCAL_REDUCTION_DB
+    instrumental = instrumental - 2
     if len(vocal) > len(instrumental):
         vocal = vocal[: len(instrumental)]
     combined = instrumental.overlay(vocal, position=0)
     output_path = f"temp/final_{run_id}.mp3"
     combined.export(output_path, format="mp3")
-    print("[6/6] Final mix exported")
+    print(f"[6/6] Final mix exported ({len(combined) / 1000:.1f}s)")
 
     # Cleanup intermediate files
-    for p in [input_path, inst_path, vocal_path]:
+    for p in [inst_path, vocal_path]:
         try:
             os.remove(p)
         except OSError:
