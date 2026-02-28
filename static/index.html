@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MemoMuse</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',-apple-system,sans-serif;background:linear-gradient(135deg,#0f0f0f,#1a1a2e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+    .logo{font-size:3rem;margin-bottom:.25rem}
+    h1{font-size:2.2rem;margin-bottom:.5rem;letter-spacing:-.02em}
+    p.subtitle{color:#888;margin-bottom:2rem;font-size:1.1rem}
+    .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;max-width:480px;width:100%}
+    select,button{padding:.75rem 1.5rem;border-radius:10px;border:none;font-size:1rem;cursor:pointer;margin:.5rem;transition:all .2s}
+    select{background:#1e1e2e;color:#fff;border:1px solid #333}
+    #recordBtn{background:#e63946;color:#fff;font-weight:600;min-width:180px}
+    #recordBtn:hover{background:#c1121f}
+    #recordBtn.recording{background:#666;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.4)}50%{box-shadow:0 0 0 12px rgba(230,57,70,0)}}
+    #generateBtn{background:#2a9d8f;color:#fff;font-weight:600;min-width:180px}
+    #generateBtn:hover{background:#21867a}
+    #generateBtn:disabled{background:#333;cursor:not-allowed}
+    #status{margin-top:1.5rem;color:#aaa;font-size:.95rem;text-align:center;min-height:1.5em}
+    audio{margin-top:1.5rem;width:100%;border-radius:8px}
+    .controls{display:flex;flex-wrap:wrap;justify-content:center;gap:.25rem}
+    .sponsors{margin-top:2rem;color:#555;font-size:.75rem;text-align:center}
+    .waveform{display:none;margin-top:1rem;height:40px;background:rgba(230,57,70,.1);border-radius:8px;overflow:hidden}
+    .waveform.active{display:flex;align-items:center;justify-content:center}
+    .waveform .bar{width:3px;margin:0 2px;background:#e63946;border-radius:2px;animation:wave .8s ease-in-out infinite}
+    @keyframes wave{0%,100%{height:8px}50%{height:30px}}
+  </style>
+</head>
+<body>
+  <div class="logo">🎵</div>
+  <h1>MemoMuse</h1>
+  <p class="subtitle">Hum your idea. Get a produced track.</p>
+  <div class="card">
+    <div class="controls">
+      <select id="genreSelect">
+        <option value="pop">Pop</option>
+        <option value="lo-fi hip hop">Lo-Fi Hip Hop</option>
+        <option value="hip hop">Hip Hop</option>
+        <option value="cinematic">Cinematic</option>
+        <option value="r&b">R&B</option>
+        <option value="indie folk">Indie Folk</option>
+        <option value="electronic">Electronic</option>
+        <option value="jazz">Jazz</option>
+      </select>
+      <button id="recordBtn" onclick="toggleRecord()">🎙 Start Recording</button>
+      <button id="generateBtn" onclick="generate()" disabled>✨ Generate Track</button>
+    </div>
+    <div class="waveform" id="waveform">
+      <div class="bar" style="animation-delay:0s"></div>
+      <div class="bar" style="animation-delay:.1s"></div>
+      <div class="bar" style="animation-delay:.2s"></div>
+      <div class="bar" style="animation-delay:.3s"></div>
+      <div class="bar" style="animation-delay:.4s"></div>
+      <div class="bar" style="animation-delay:.3s"></div>
+      <div class="bar" style="animation-delay:.2s"></div>
+      <div class="bar" style="animation-delay:.1s"></div>
+    </div>
+    <p id="status">Press record and hum your idea.</p>
+    <audio id="outputAudio" controls style="display:none;"></audio>
+  </div>
+  <div class="sponsors">Powered by ElevenLabs • Backboard.io • Google Gemini • Featherless AI • Pianofi</div>
+  <script>
+    let mediaRecorder,audioChunks=[],audioBlob=null;
+    const API_URL=window.location.origin;
+
+    async function toggleRecord(){
+      const btn=document.getElementById("recordBtn"),wave=document.getElementById("waveform");
+      if(mediaRecorder&&mediaRecorder.state==="recording"){
+        mediaRecorder.stop();btn.textContent="🎙 Start Recording";btn.classList.remove("recording");wave.classList.remove("active");return;
+      }
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        mediaRecorder=new MediaRecorder(stream);audioChunks=[];
+        mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
+        mediaRecorder.onstop=()=>{
+          audioBlob=new Blob(audioChunks,{type:"audio/webm"});
+          document.getElementById("generateBtn").disabled=false;
+          document.getElementById("status").textContent="Recording saved! Ready to generate.";
+          stream.getTracks().forEach(t=>t.stop());
+        };
+        mediaRecorder.start();btn.textContent="⏹ Stop Recording";btn.classList.add("recording");wave.classList.add("active");
+        document.getElementById("status").textContent="Recording... hum your idea!";
+      }catch(err){document.getElementById("status").textContent="Mic access denied.";}
+    }
+
+    async function generate(){
+      if(!audioBlob)return;
+      const statusEl=document.getElementById("status"),genBtn=document.getElementById("generateBtn");
+      statusEl.textContent="Generating your track... ⏳ (30-60 seconds)";genBtn.disabled=true;
+      const formData=new FormData();
+      formData.append("audio",audioBlob,"recording.webm");
+      formData.append("genre",document.getElementById("genreSelect").value);
+      try{
+        const response=await fetch(`${API_URL}/generate`,{method:"POST",body:formData});
+        if(!response.ok)throw new Error(`Server error: ${response.status}`);
+        const audioEl=document.getElementById("outputAudio");
+        audioEl.src=URL.createObjectURL(await response.blob());audioEl.style.display="block";audioEl.play();
+        statusEl.textContent="🎉 Your track is ready!";
+      }catch(err){statusEl.textContent="Error generating track.";console.error(err);}
+      genBtn.disabled=false;
+    }
+  </script>
+</body>
+</html>
