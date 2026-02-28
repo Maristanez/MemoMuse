@@ -27,12 +27,14 @@ def create_vinyl_product(song_title: str, lyrics: str, genre: str, mood: str, bp
             "body_html": description,
             "vendor": "MemoMuse",
             "product_type": "Vinyl Record",
+            "status": "active",
+            "published": True,
             "tags": f"memomuse, ai-generated, {genre.lower()}, vinyl",
             "variants": [
                 {
                     "price": "24.99",
                     "sku": f"MM-VINYL-{hash(song_title) % 99999:05d}",
-                    "inventory_management": None,
+                    "inventory_quantity": 100,
                     "requires_shipping": True,
                 }
             ],
