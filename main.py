@@ -171,5 +171,10 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/voicemail")
+async def voicemail():
+    return FileResponse("static/voicemail.html")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
