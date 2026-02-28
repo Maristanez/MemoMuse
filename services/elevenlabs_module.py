@@ -39,7 +39,7 @@ def convert_speech_to_speech(audio_path: str, output_path: str = "temp/vocals.mp
             audio=audio_file,
             model_id="eleven_multilingual_sts_v2",
         )
-    with open(output_path, "wb") as f:
-        for chunk in audio:
-            f.write(chunk)
+        with open(output_path, "wb") as f:
+            for chunk in audio:
+                f.write(chunk)
     return output_path
