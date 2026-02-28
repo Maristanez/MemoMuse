@@ -1298,8 +1298,8 @@
       if (data.error) {
         alert('Could not create product: ' + data.error);
       } else if (data.product_url) {
-        if (label) label.textContent = 'Published! View in Store →';
-        window.open(data.product_url, '_blank');
+        if (label) label.textContent = 'Published! Opening store...';
+        setTimeout(() => window.open(data.product_url, '_blank'), 8000);
       }
     } catch (err) {
       console.error('Publish error:', err);

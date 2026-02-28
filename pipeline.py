@@ -66,24 +66,37 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
         )
         print("      -> Using STS to preserve hummed melody")
     inst_path = await instrumental_task
-    vocal_path = await vocal_task
-    print("[5/6] Audio generated")
+    try:
+        vocal_path = await vocal_task
+    except Exception as e:
+        vocal_path = None
+        print(f"[5/6] Vocal generation failed ({e}), falling back to instrumental only")
 
-    # Step 6: Mix — layer vocals over instrumental
+    if vocal_path:
+        print("[5/6] Audio generated")
+    else:
+        print("[5/6] Instrumental generated (vocals skipped)")
+
+    # Step 6: Mix — layer vocals over instrumental, or export instrumental only
     instrumental = AudioSegment.from_file(inst_path)
-    vocal = AudioSegment.from_file(vocal_path)
 
-    # Normalize both to -20 dBFS then apply relative balance
-    def normalize(seg, target_dbfs=-20.0):
-        change = target_dbfs - seg.dBFS
-        return seg.apply_gain(change)
+    if vocal_path:
+        vocal = AudioSegment.from_file(vocal_path)
 
-    instrumental = normalize(instrumental) - INSTRUMENTAL_CUT_DB
-    vocal = normalize(vocal) + VOCAL_BOOST_DB
+        # Normalize both to -20 dBFS then apply relative balance
+        def normalize(seg, target_dbfs=-20.0):
+            change = target_dbfs - seg.dBFS
+            return seg.apply_gain(change)
 
-    if len(vocal) > len(instrumental):
-        vocal = vocal[: len(instrumental)]
-    combined = instrumental.overlay(vocal, position=0)
+        instrumental = normalize(instrumental) - INSTRUMENTAL_CUT_DB
+        vocal = normalize(vocal) + VOCAL_BOOST_DB
+
+        if len(vocal) > len(instrumental):
+            vocal = vocal[: len(instrumental)]
+        combined = instrumental.overlay(vocal, position=0)
+    else:
+        combined = instrumental
+
     output_path = f"temp/final_{run_id}.mp3"
     combined.export(output_path, format="mp3")
     print(f"[6/6] Final mix exported ({len(combined) / 1000:.1f}s)")

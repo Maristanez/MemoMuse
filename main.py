@@ -13,7 +13,7 @@ from elevenlabs.client import ElevenLabs
 from elevenlabs import VoiceSettings
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
