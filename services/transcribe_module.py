@@ -1,5 +1,7 @@
+import ssl
 import whisper
 
+ssl._create_default_https_context = ssl._create_unverified_context
 _model = None
 
 def _get_model():
