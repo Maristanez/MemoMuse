@@ -1,5 +1,6 @@
 import os, asyncio, uuid
 from pydub import AudioSegment
+from pydub.effects import low_pass_filter, high_pass_filter
 from services.gemini_module import get_gemini_analysis
 from services.elevenlabs_module import convert_speech_to_speech, synthesize_vocals
 from services.lyria_module import generate_instrumental
@@ -11,7 +12,28 @@ VOCAL_BOOST_DB = 6
 INSTRUMENTAL_CUT_DB = 6
 
 
-async def run_pipeline(input_path: str, genre: str) -> dict:
+def apply_eq(audio: AudioSegment, bass: int = 0, treble: int = 0) -> AudioSegment:
+    """Apply bass/treble EQ. Values range from -10 to +10."""
+    if bass != 0:
+        low = low_pass_filter(audio, 250)
+        audio = audio.overlay(low.apply_gain(bass * 1.5))
+    if treble != 0:
+        high = high_pass_filter(audio, 4000)
+        audio = audio.overlay(high.apply_gain(treble * 1.5))
+    return audio
+
+
+def apply_pitch_shift(audio: AudioSegment, semitones: int = 0) -> AudioSegment:
+    """Shift pitch by semitones (-12 to +12) via sample rate manipulation."""
+    if semitones == 0:
+        return audio
+    factor = 2 ** (semitones / 12.0)
+    new_rate = int(audio.frame_rate * factor)
+    shifted = audio._spawn(audio.raw_data, overrides={"frame_rate": new_rate})
+    return shifted.set_frame_rate(audio.frame_rate)
+
+
+async def run_pipeline(input_path: str, genre: str, studio: dict = None) -> dict:
     os.makedirs("temp", exist_ok=True)
     run_id = uuid.uuid4().hex[:8]
 
@@ -47,9 +69,19 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
     except Exception as e:
         print(f"[4/6] Featherless skipped: {e}")
 
+    # Parse studio controls
+    if not studio:
+        studio = {}
+    voice_id = studio.get("voice_id") or None
+    voice_stability = studio.get("stability", 0.3)
+    voice_similarity = studio.get("similarity", 0.75)
+    voice_style = studio.get("style", 0.45)
+    bass_eq = studio.get("bass", 0)
+    treble_eq = studio.get("treble", 0)
+    pitch_shift = studio.get("pitch", 0)
+    vocal_balance = studio.get("vocal_balance", 0)
+
     # Step 5: Parallel generation — instrumental + vocals
-    # If user sang lyrics → TTS with expanded lyrics
-    # If user hummed → STS to preserve their melody
     inst_path = f"temp/instrumental_{run_id}.wav"
     vocal_path = f"temp/vocals_{run_id}.mp3"
     instrumental_task = asyncio.create_task(
@@ -57,12 +89,13 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
     )
     if contains_lyrics:
         vocal_task = asyncio.create_task(
-            asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path)
+            asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path,
+                              voice_id, voice_stability, voice_similarity, voice_style)
         )
-        print("      → Using TTS with generated lyrics")
+        print(f"      → Using TTS{' with voice ' + voice_id[:8] if voice_id else ''}")
     else:
         vocal_task = asyncio.create_task(
-            asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
+            asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path, voice_id)
         )
         print("      → Using STS to preserve hummed melody")
     inst_path = await instrumental_task
@@ -83,19 +116,29 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
     if vocal_path:
         vocal = AudioSegment.from_file(vocal_path)
 
-        # Normalize both to -20 dBFS then apply relative balance
         def normalize(seg, target_dbfs=-20.0):
             change = target_dbfs - seg.dBFS
             return seg.apply_gain(change)
 
-        instrumental = normalize(instrumental) - INSTRUMENTAL_CUT_DB
-        vocal = normalize(vocal) + VOCAL_BOOST_DB
+        adjusted_vocal_boost = VOCAL_BOOST_DB + vocal_balance
+        adjusted_inst_cut = INSTRUMENTAL_CUT_DB - vocal_balance
+
+        instrumental = normalize(instrumental) - adjusted_inst_cut
+        vocal = normalize(vocal) + adjusted_vocal_boost
 
         if len(vocal) > len(instrumental):
             vocal = vocal[: len(instrumental)]
         combined = instrumental.overlay(vocal, position=0)
     else:
         combined = instrumental
+
+    # Apply studio post-processing
+    if bass_eq or treble_eq:
+        combined = apply_eq(combined, bass_eq, treble_eq)
+        print(f"      Applied EQ: bass={bass_eq:+d}, treble={treble_eq:+d}")
+    if pitch_shift:
+        combined = apply_pitch_shift(combined, pitch_shift)
+        print(f"      Applied pitch shift: {pitch_shift:+d} semitones")
 
     output_path = f"temp/final_{run_id}.mp3"
     combined.export(output_path, format="mp3")

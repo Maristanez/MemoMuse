@@ -275,6 +275,56 @@
     }
     @keyframes chipSelect{0%{transform:scale(.92)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
 
+    /* Studio Controls */
+    .studio-toggle{
+      display:flex;align-items:center;gap:.6rem;cursor:pointer;
+      color:var(--muted);font-size:.85rem;margin-bottom:1rem;
+      transition:color .2s;user-select:none;
+    }
+    .studio-toggle:hover{color:#fff}
+    .studio-toggle svg{transition:transform .3s}
+    .studio-toggle.open svg{transform:rotate(90deg)}
+    .studio-panel{
+      max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.16,1,.3,1);
+      margin-bottom:1rem;
+    }
+    .studio-panel.open{max-height:600px}
+    .studio-inner{
+      background:rgba(255,255,255,.03);border:1px solid var(--border);
+      border-radius:16px;padding:1.25rem;
+      display:flex;flex-direction:column;gap:1.2rem;
+    }
+    .studio-row{display:flex;align-items:center;gap:1rem}
+    .studio-row label{
+      font-size:.75rem;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.05em;min-width:80px;
+    }
+    .studio-row select, .studio-row input[type=range]{flex:1}
+    .studio-row select{
+      background:rgba(255,255,255,.06);border:1px solid var(--border);
+      color:#fff;border-radius:8px;padding:.5rem .75rem;font-size:.85rem;
+      appearance:none;cursor:pointer;
+    }
+    .studio-row select:focus{outline:none;border-color:var(--red)}
+    .studio-row input[type=range]{
+      -webkit-appearance:none;height:4px;border-radius:2px;
+      background:rgba(255,255,255,.12);outline:none;cursor:pointer;
+    }
+    .studio-row input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+      background:var(--red);border:2px solid #1a1a2e;cursor:pointer;
+    }
+    .studio-val{
+      font-size:.75rem;color:var(--red);min-width:32px;text-align:right;
+      font-variant-numeric:tabular-nums;
+    }
+    .voice-preview-btn{
+      background:none;border:1px solid var(--border);border-radius:6px;
+      color:var(--muted);font-size:.7rem;padding:.25rem .5rem;cursor:pointer;
+      transition:all .2s;
+    }
+    .voice-preview-btn:hover{color:#fff;border-color:rgba(255,255,255,.2)}
+
     .record-area{
       display:flex;flex-direction:column;align-items:center;
       padding:2rem 0;gap:1rem;
@@ -814,6 +864,41 @@
         <button class="genre-chip" data-genre="jazz">Jazz</button>
       </div>
 
+      <!-- Studio Controls Toggle -->
+      <div class="studio-toggle" id="studioToggle" onclick="toggleStudio()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        <span>Studio Controls</span>
+      </div>
+      <div class="studio-panel" id="studioPanel">
+        <div class="studio-inner">
+          <div class="studio-row">
+            <label>Voice</label>
+            <select id="voiceSelect"><option value="">Default Voice</option></select>
+            <button class="voice-preview-btn" onclick="previewVoice()">Preview</button>
+          </div>
+          <div class="studio-row">
+            <label>Bass</label>
+            <input type="range" id="bassSlider" min="-10" max="10" value="0" oninput="updateSliderVal(this,'bassVal')">
+            <span class="studio-val" id="bassVal">0</span>
+          </div>
+          <div class="studio-row">
+            <label>Treble</label>
+            <input type="range" id="trebleSlider" min="-10" max="10" value="0" oninput="updateSliderVal(this,'trebleVal')">
+            <span class="studio-val" id="trebleVal">0</span>
+          </div>
+          <div class="studio-row">
+            <label>Pitch</label>
+            <input type="range" id="pitchSlider" min="-6" max="6" value="0" step="1" oninput="updateSliderVal(this,'pitchVal','st')">
+            <span class="studio-val" id="pitchVal">0st</span>
+          </div>
+          <div class="studio-row">
+            <label>Vocal Mix</label>
+            <input type="range" id="vocalSlider" min="-6" max="6" value="0" step="1" oninput="updateSliderVal(this,'vocalVal','dB')">
+            <span class="studio-val" id="vocalVal">0dB</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Record -->
       <div class="record-area">
         <button class="big-record-btn" id="recordBtn" onclick="toggleRecord()">
@@ -998,6 +1083,64 @@
     }
   }, { passive: true });
 
+  // ─── Studio controls ───
+  const _$ = id => document.getElementById(id);
+  function toggleStudio() {
+    const toggle = _$('studioToggle');
+    const panel = _$('studioPanel');
+    toggle.classList.toggle('open');
+    panel.classList.toggle('open');
+  }
+
+  function updateSliderVal(el, valId, suffix = '') {
+    const v = parseInt(el.value);
+    _$(valId).textContent = (v > 0 ? '+' : '') + v + suffix;
+  }
+
+  let voicesLoaded = false;
+  async function loadVoices() {
+    if (voicesLoaded) return;
+    try {
+      const res = await fetch(`${API_URL}/api/voices`);
+      const voices = await res.json();
+      const select = _$('voiceSelect');
+      voices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.voice_id;
+        opt.textContent = `${v.name}${v.gender ? ' · ' + v.gender : ''}${v.accent ? ' · ' + v.accent : ''}`;
+        opt.dataset.preview = v.preview_url || '';
+        select.appendChild(opt);
+      });
+      voicesLoaded = true;
+    } catch (e) { console.warn('Could not load voices:', e); }
+  }
+
+  const studioObserver = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) { loadVoices(); studioObserver.disconnect(); }
+  });
+  studioObserver.observe(_$('studioPanel'));
+
+  function previewVoice() {
+    const select = _$('voiceSelect');
+    const opt = select.options[select.selectedIndex];
+    const url = opt?.dataset?.preview;
+    if (url) {
+      const a = new Audio(url);
+      a.volume = 0.7;
+      a.play();
+    }
+  }
+
+  function getStudioParams() {
+    return {
+      voice_id: _$('voiceSelect').value || null,
+      bass: parseInt(_$('bassSlider').value),
+      treble: parseInt(_$('trebleSlider').value),
+      pitch: parseInt(_$('pitchSlider').value),
+      vocal_balance: parseInt(_$('vocalSlider').value),
+    };
+  }
+
   // ─── Genre selection ───
   let selectedGenre = 'pop';
   document.querySelectorAll('.genre-chip').forEach(chip => {
@@ -1172,6 +1315,7 @@
     const fd = new FormData();
     fd.append('audio', audioBlob, 'recording.webm');
     fd.append('genre', selectedGenre);
+    fd.append('studio', JSON.stringify(getStudioParams()));
 
     try {
       const res = await fetch(`${API_URL}/generate`, { method: 'POST', body: fd });

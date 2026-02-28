@@ -2,10 +2,11 @@ from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import uvicorn, traceback
+import uvicorn, traceback, json
 from dotenv import load_dotenv
 from pipeline import run_pipeline
 from services.shopify_module import create_vinyl_product
+from services.elevenlabs_module import get_voices
 import os, uuid
 
 from dotenv import load_dotenv
@@ -21,13 +22,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/generate")
-async def generate(audio: UploadFile = File(...), genre: str = Form(default="pop")):
+async def generate(audio: UploadFile = File(...), genre: str = Form(default="pop"),
+                   studio: str = Form(default="{}")):
     os.makedirs("temp", exist_ok=True)
     input_path = f"temp/input_{uuid.uuid4().hex}.webm"
     with open(input_path, "wb") as f:
         f.write(await audio.read())
     try:
-        result = await run_pipeline(input_path, genre)
+        studio_params = json.loads(studio) if studio else {}
+    except (json.JSONDecodeError, TypeError):
+        studio_params = {}
+    try:
+        result = await run_pipeline(input_path, genre, studio_params)
         filename = os.path.basename(result["output_path"])
         return JSONResponse({
             "audio_url": f"/audio/{filename}",
@@ -38,6 +44,17 @@ async def generate(audio: UploadFile = File(...), genre: str = Form(default="pop
             "genre": result["genre"],
             "key": result["key"],
         })
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/voices")
+async def list_voices():
+    """Return available ElevenLabs voices."""
+    try:
+        voices = get_voices()
+        return JSONResponse(voices)
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
