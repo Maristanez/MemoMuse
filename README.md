@@ -26,13 +26,29 @@ MemoMuse transforms rough voice memos into fully produced music demos. Record a 
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Install System Dependencies
+
+MemoMuse uses `pydub` which requires `ffmpeg` to process audio files.
+On macOS:
+```sh
+brew install ffmpeg
+```
+On Ubuntu/Debian:
+```sh
+sudo apt update && sudo apt install ffmpeg
+```
+
+### 2. Create Virtual Environment & Install Python Dependencies
+
+It is highly recommended to use a Python virtual environment to avoid conflicts.
 
 ```sh
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+### 3. Configure environment
 
 Copy the example env file and fill in your keys:
 
@@ -47,9 +63,12 @@ cp .env.example .env
 | `FEATHERLESS_API_KEY` | No | Featherless AI key |
 | `BACKBOARD_API_KEY` | No | Backboard.io key |
 
-### 3. Run
+### 4. Run the Server
+
+Make sure your virtual environment is activated before running the server:
 
 ```sh
+source venv/bin/activate
 python main.py
 ```
 
