@@ -1,5 +1,4 @@
 from elevenlabs.client import ElevenLabs
-from elevenlabs import VoiceSettings
 import os
 
 _client = None
@@ -12,18 +11,13 @@ def _get_client():
     return _client
 
 
-def synthesize_vocals(lyrics: str, output_path: str = "temp/vocals.mp3") -> str:
-    audio = _get_client().text_to_speech.convert(
-        voice_id="21m00Tcm4TlvDq8ikWAM",
-        text=lyrics,
-        model_id="eleven_multilingual_v2",
-        voice_settings=VoiceSettings(
-            stability=0.4,
-            similarity_boost=0.8,
-            style=0.3,
-            use_speaker_boost=True,
-        ),
-    )
+def convert_speech_to_speech(audio_path: str, output_path: str = "temp/vocals.mp3") -> str:
+    with open(audio_path, "rb") as audio_file:
+        audio = _get_client().speech_to_speech.convert(
+            voice_id="21m00Tcm4TlvDq8ikWAM",
+            audio=audio_file,
+            model_id="eleven_multilingual_sts_v2",
+        )
     with open(output_path, "wb") as f:
         for chunk in audio:
             f.write(chunk)

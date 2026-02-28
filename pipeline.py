@@ -1,7 +1,7 @@
 import os, asyncio, uuid
 from pydub import AudioSegment
 from services.gemini_module import get_gemini_analysis
-from services.elevenlabs_module import synthesize_vocals
+from services.elevenlabs_module import convert_speech_to_speech
 from services.lyria_module import generate_instrumental
 from services.transcribe_module import transcribe_audio
 from services.backboard_module import store_session
@@ -51,7 +51,7 @@ async def run_pipeline(input_path: str, genre: str) -> str:
         asyncio.to_thread(generate_instrumental, style_prompt, bpm, inst_path)
     )
     vocal_task = asyncio.create_task(
-        asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path)
+        asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
     )
     inst_path = await instrumental_task
     vocal_path = await vocal_task
