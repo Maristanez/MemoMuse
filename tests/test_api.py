@@ -15,6 +15,7 @@ def client():
 
 DUMMY_PIPELINE_RESULT = {
     "output_path": "temp/final_test1234.mp3",
+    "song_title": "Midnight Walk",
     "lyrics": "I walk alone tonight",
     "mood": "melancholic",
     "bpm": 120,
