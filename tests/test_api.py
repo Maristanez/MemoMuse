@@ -1,110 +1,94 @@
-"""API tests for main.py FastAPI endpoints."""
+"""API tests for main.py — /generate endpoint via FastAPI TestClient."""
+
 import os
 import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
-from pydub import AudioSegment
 
-
-@pytest.fixture
-def dummy_output_mp3(tmp_path):
-    """Creates a dummy MP3 that run_pipeline will 'return'."""
-    path = str(tmp_path / "final_output.mp3")
-    AudioSegment.silent(duration=1000).export(path, format="mp3")
-    return path
+from main import app
 
 
 @pytest.fixture
 def client():
-    """Provides a FastAPI TestClient."""
-    from main import app
     return TestClient(app)
 
 
+DUMMY_PIPELINE_RESULT = {
+    "output_path": "temp/final_test1234.mp3",
+    "lyrics": "I walk alone tonight",
+    "mood": "melancholic",
+    "bpm": 120,
+    "genre": "pop",
+    "key": "A minor",
+}
+
+
 class TestGenerateEndpoint:
-    """Tests for POST /generate."""
 
-    @patch("main.run_pipeline", new_callable=AsyncMock)
-    def test_returns_200_with_audio(self, mock_pipeline, client, dummy_output_mp3):
-        """Successful generation returns 200 with audio/mpeg content."""
-        mock_pipeline.return_value = dummy_output_mp3
+    @patch("main.run_pipeline", new_callable=AsyncMock, return_value=DUMMY_PIPELINE_RESULT)
+    def test_returns_json_with_audio_url(self, mock_pipeline, client):
+        os.makedirs("temp", exist_ok=True)
+        with open("temp/final_test1234.mp3", "wb") as f:
+            f.write(b"fake_mp3")
 
-        # Create a fake audio upload
-        response = client.post(
-            "/generate",
-            files={"audio": ("recording.webm", b"fake audio data", "audio/webm")},
-            data={"genre": "pop"},
-        )
-
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "audio/mpeg"
-
-    @patch("main.run_pipeline", new_callable=AsyncMock)
-    def test_default_genre_is_pop(self, mock_pipeline, client, dummy_output_mp3):
-        """When no genre is specified, defaults to 'pop'."""
-        mock_pipeline.return_value = dummy_output_mp3
-
-        client.post(
-            "/generate",
-            files={"audio": ("recording.webm", b"fake audio data", "audio/webm")},
-        )
-
-        call_args = mock_pipeline.call_args[0]
-        assert call_args[1] == "pop"  # genre argument
-
-    @patch("main.run_pipeline", new_callable=AsyncMock)
-    def test_passes_genre_to_pipeline(self, mock_pipeline, client, dummy_output_mp3):
-        """Custom genre is forwarded to run_pipeline."""
-        mock_pipeline.return_value = dummy_output_mp3
-
-        client.post(
-            "/generate",
-            files={"audio": ("recording.webm", b"fake audio data", "audio/webm")},
-            data={"genre": "jazz"},
-        )
-
-        call_args = mock_pipeline.call_args[0]
-        assert call_args[1] == "jazz"
-
-    @patch("main.run_pipeline", new_callable=AsyncMock)
-    def test_saves_uploaded_file_to_temp(self, mock_pipeline, client, dummy_output_mp3):
-        """Uploaded audio is saved to the temp directory."""
-        mock_pipeline.return_value = dummy_output_mp3
-
-        client.post(
-            "/generate",
-            files={"audio": ("recording.webm", b"fake audio data", "audio/webm")},
-            data={"genre": "pop"},
-        )
-
-        # First arg to run_pipeline should be a temp path
-        input_path = mock_pipeline.call_args[0][0]
-        assert input_path.startswith("temp/input_")
-        assert input_path.endswith(".webm")
-
-    @patch("main.run_pipeline", new_callable=AsyncMock)
-    def test_pipeline_error_raises(self, mock_pipeline, client):
-        """Internal pipeline error propagates as an exception."""
-        mock_pipeline.side_effect = Exception("Something broke")
-
-        with pytest.raises(Exception, match="Something broke"):
-            client.post(
+        try:
+            response = client.post(
                 "/generate",
-                files={"audio": ("recording.webm", b"fake audio data", "audio/webm")},
+                files={"audio": ("test.webm", b"fake_audio", "audio/webm")},
                 data={"genre": "pop"},
             )
 
+            assert response.status_code == 200
+            body = response.json()
+            assert body["audio_url"] == "/audio/final_test1234.mp3"
+            assert body["lyrics"] == "I walk alone tonight"
+            assert body["mood"] == "melancholic"
+            assert body["bpm"] == 120
+            assert body["genre"] == "pop"
+            assert body["key"] == "A minor"
+        finally:
+            try:
+                os.remove("temp/final_test1234.mp3")
+            except OSError:
+                pass
+
+    @patch("main.run_pipeline", new_callable=AsyncMock, return_value=DUMMY_PIPELINE_RESULT)
+    def test_default_genre_is_pop(self, mock_pipeline, client):
+        os.makedirs("temp", exist_ok=True)
+        with open("temp/final_test1234.mp3", "wb") as f:
+            f.write(b"fake_mp3")
+
+        try:
+            client.post(
+                "/generate",
+                files={"audio": ("test.webm", b"fake_audio", "audio/webm")},
+            )
+            call_args = mock_pipeline.call_args[0]
+            assert call_args[1] == "pop"
+        finally:
+            try:
+                os.remove("temp/final_test1234.mp3")
+            except OSError:
+                pass
+
+    @patch("main.run_pipeline", new_callable=AsyncMock, side_effect=RuntimeError("boom"))
+    def test_returns_500_on_error(self, mock_pipeline, client):
+        response = client.post(
+            "/generate",
+            files={"audio": ("test.webm", b"fake_audio", "audio/webm")},
+            data={"genre": "rock"},
+        )
+        assert response.status_code == 500
+        assert "boom" in response.json()["error"]
+
     def test_missing_audio_returns_422(self, client):
-        """Request without audio file returns 422 validation error."""
         response = client.post("/generate", data={"genre": "pop"})
         assert response.status_code == 422
 
 
 class TestRootEndpoint:
-    """Tests for GET /."""
 
     def test_returns_html(self, client):
-        """Root endpoint serves the index.html file."""
         response = client.get("/")
         assert response.status_code == 200
         assert "MemoMuse" in response.text

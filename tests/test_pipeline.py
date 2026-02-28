@@ -1,182 +1,221 @@
-"""Integration tests for pipeline.py — verifies orchestration order and data flow."""
+"""Integration tests for pipeline.py — verifies TTS/STS conditional routing."""
+
 import os
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock, call
+from unittest.mock import patch, AsyncMock
 from pydub import AudioSegment
 
-
-@pytest.fixture
-def mock_services(tmp_path):
-    """Patches all service modules and returns the mocks + temp audio files."""
-    # Create real audio files so pydub can load them
-    instrumental_path = str(tmp_path / "instrumental.wav")
-    vocal_path = str(tmp_path / "vocals.mp3")
-
-    tone = AudioSegment.silent(duration=2000)
-    tone.export(instrumental_path, format="wav")
-    tone.export(vocal_path, format="mp3")
-
-    patches = {
-        "transcribe": patch("pipeline.transcribe_audio", return_value="raw transcript text"),
-        "gemini": patch("pipeline.get_gemini_analysis", return_value={
-            "cleaned_lyrics": "cleaned lyrics here",
-            "style_prompt": "upbeat pop 120bpm",
-            "mood": "happy",
-            "bpm": 120,
-        }),
-        "backboard": patch("pipeline.store_session", new_callable=AsyncMock),
-        "featherless": patch("pipeline.refine_lyrics", return_value="refined lyrics here"),
-        "lyria": patch("pipeline.generate_instrumental", return_value=instrumental_path),
-        "elevenlabs": patch("pipeline.synthesize_vocals", return_value=vocal_path),
-    }
-
-    mocks = {}
-    for name, p in patches.items():
-        mocks[name] = p.start()
-
-    yield mocks, tmp_path
-
-    for p in patches.values():
-        p.stop()
+from pipeline import run_pipeline
 
 
-class TestRunPipeline:
-    """Integration tests for the 6-step pipeline orchestration."""
+def _make_dummy_audio(path):
+    """Write a minimal audio file so pydub can load it."""
+    fmt = "wav" if path.endswith(".wav") else "mp3"
+    AudioSegment.silent(duration=1000).export(path, format=fmt)
 
-    @pytest.mark.asyncio
-    async def test_full_pipeline_returns_mp3(self, mock_services):
-        """Pipeline runs all 6 steps and returns a path to the final MP3."""
-        mocks, tmp_path = mock_services
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            result = await run_pipeline("input.webm", "pop")
+def _side_effect_instrumental(style_prompt, bpm, output_path):
+    _make_dummy_audio(output_path)
+    return output_path
 
-        assert result == "temp/final_output.mp3"
+
+def _side_effect_tts(lyrics, output_path):
+    _make_dummy_audio(output_path)
+    return output_path
+
+
+def _side_effect_sts(audio_path, output_path):
+    _make_dummy_audio(output_path)
+    return output_path
+
+
+HUMMING_GEMINI = {
+    "contains_lyrics": False,
+    "cleaned_lyrics": "",
+    "style_prompt": "jazz smooth 90bpm saxophone mellow",
+    "detected_genre": "jazz",
+    "mood": "dreamy",
+    "bpm": 90,
+    "key": "C major",
+}
+
+LYRICS_GEMINI = {
+    "contains_lyrics": True,
+    "cleaned_lyrics": "I walk alone tonight under the stars",
+    "style_prompt": "pop upbeat 120bpm guitar synth",
+    "detected_genre": "pop",
+    "mood": "melancholic",
+    "bpm": 120,
+    "key": "A minor",
+}
+
+
+class TestHummingRouting:
+    """When contains_lyrics is False, pipeline routes to STS."""
 
     @pytest.mark.asyncio
-    async def test_step1_transcription_called_with_input(self, mock_services):
-        """Step 1: transcribe_audio is called with the input path."""
-        mocks, _ = mock_services
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=HUMMING_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="hmm hmm la la la")
+    async def test_sts_called_tts_not_called(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("my_recording.webm", "pop")
+        await run_pipeline(input_file, "jazz")
 
-        mocks["transcribe"].assert_called_once_with("my_recording.webm")
-
-    @pytest.mark.asyncio
-    async def test_step2_gemini_receives_transcript_and_genre(self, mock_services):
-        """Step 2: Gemini analysis gets the raw transcript and genre."""
-        mocks, _ = mock_services
-
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "jazz")
-
-        mocks["gemini"].assert_called_once_with("raw transcript text", "jazz")
-
-    @pytest.mark.asyncio
-    async def test_step3_backboard_called_with_session_data(self, mock_services):
-        """Step 3: Backboard store_session is called with correct args."""
-        mocks, _ = mock_services
-
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
-
-        mocks["backboard"].assert_called_once_with(
-            "raw transcript text", "cleaned lyrics here",
-            "upbeat pop 120bpm", "pop", "happy"
-        )
+        mock_sts.assert_called_once()
+        assert mock_sts.call_args[0][0] == input_file
+        mock_tts.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_step3_backboard_failure_does_not_halt_pipeline(self, mock_services):
-        """Pipeline continues even if Backboard raises an exception."""
-        mocks, _ = mock_services
-        mocks["backboard"].side_effect = Exception("Backboard down")
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=HUMMING_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="hmm hmm")
+    async def test_instrumental_gets_correct_params(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            result = await run_pipeline("input.webm", "pop")
+        result = await run_pipeline(input_file, "jazz")
 
-        assert result == "temp/final_output.mp3"
+        args = mock_instrumental.call_args[0]
+        assert args[0] == "jazz smooth 90bpm saxophone mellow"
+        assert args[1] == 90
+        assert result["mood"] == "dreamy"
+        assert result["bpm"] == 90
 
-    @pytest.mark.asyncio
-    async def test_step4_featherless_refines_lyrics(self, mock_services):
-        """Step 4: Featherless refine_lyrics is called with cleaned lyrics."""
-        mocks, _ = mock_services
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
-
-        mocks["featherless"].assert_called_once_with(
-            "cleaned lyrics here", "pop", "happy"
-        )
-
-    @pytest.mark.asyncio
-    async def test_step4_featherless_failure_uses_original_lyrics(self, mock_services):
-        """If Featherless fails, original cleaned lyrics are used for vocals."""
-        mocks, _ = mock_services
-        mocks["featherless"].side_effect = Exception("Featherless down")
-
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
-
-        # synthesize_vocals should receive the original cleaned lyrics
-        mocks["elevenlabs"].assert_called_once_with("cleaned lyrics here")
+class TestLyricsRouting:
+    """When contains_lyrics is True, pipeline routes to TTS."""
 
     @pytest.mark.asyncio
-    async def test_step4_featherless_none_uses_original_lyrics(self, mock_services):
-        """If Featherless returns None, original cleaned lyrics are used."""
-        mocks, _ = mock_services
-        mocks["featherless"].return_value = None
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=LYRICS_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="I walk alone tonight")
+    async def test_tts_called_sts_not_called(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
+        await run_pipeline(input_file, "pop")
 
-        mocks["elevenlabs"].assert_called_once_with("cleaned lyrics here")
-
-    @pytest.mark.asyncio
-    async def test_step5_parallel_generation(self, mock_services):
-        """Step 5: Both instrumental and vocal generation are called."""
-        mocks, _ = mock_services
-
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
-
-        mocks["lyria"].assert_called_once_with("upbeat pop 120bpm", 120)
-        mocks["elevenlabs"].assert_called_once_with("refined lyrics here")
+        mock_tts.assert_called_once()
+        assert mock_tts.call_args[0][0] == "I walk alone tonight under the stars"
+        mock_sts.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_step5_vocals_use_refined_lyrics(self, mock_services):
-        """When Featherless succeeds, vocals use the refined lyrics."""
-        mocks, _ = mock_services
-        mocks["featherless"].return_value = "polished version of lyrics"
+    @patch("pipeline.refine_lyrics", return_value="polished lyrics")
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=LYRICS_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="I walk alone tonight")
+    async def test_tts_uses_refined_lyrics_when_available(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
+        await run_pipeline(input_file, "pop")
 
-        mocks["elevenlabs"].assert_called_once_with("polished version of lyrics")
+        mock_tts.assert_called_once()
+        assert mock_tts.call_args[0][0] == "polished lyrics"
+
+
+class TestPipelineOutput:
+    """Verify the pipeline produces the expected output."""
 
     @pytest.mark.asyncio
-    async def test_defaults_when_gemini_omits_optional_fields(self, mock_services):
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=LYRICS_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="hello world")
+    async def test_returns_dict_with_output_path(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
+
+        result = await run_pipeline(input_file, "pop")
+
+        assert "output_path" in result
+        assert os.path.exists(result["output_path"])
+        assert result["mood"] == "melancholic"
+        assert result["bpm"] == 120
+        assert result["genre"] == "pop"
+
+    @pytest.mark.asyncio
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock, side_effect=Exception("down"))
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value=LYRICS_GEMINI)
+    @patch("pipeline.transcribe_audio", return_value="hello")
+    async def test_backboard_failure_does_not_halt(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
+
+        result = await run_pipeline(input_file, "pop")
+
+        assert "output_path" in result
+
+    @pytest.mark.asyncio
+    @patch("pipeline.refine_lyrics", return_value=None)
+    @patch("pipeline.store_session", new_callable=AsyncMock)
+    @patch("pipeline.generate_instrumental", side_effect=_side_effect_instrumental)
+    @patch("pipeline.convert_speech_to_speech", side_effect=_side_effect_sts)
+    @patch("pipeline.synthesize_vocals", side_effect=_side_effect_tts)
+    @patch("pipeline.get_gemini_analysis", return_value={
+        "contains_lyrics": True,
+        "cleaned_lyrics": "lyrics",
+        "style_prompt": "style",
+    })
+    @patch("pipeline.transcribe_audio", return_value="test")
+    async def test_defaults_when_gemini_omits_optional_fields(
+        self, mock_transcribe, mock_gemini, mock_tts, mock_sts,
+        mock_instrumental, mock_store, mock_refine, tmp_path
+    ):
         """Pipeline uses defaults (mood=neutral, bpm=120) if Gemini omits them."""
-        mocks, _ = mock_services
-        mocks["gemini"].return_value = {
-            "cleaned_lyrics": "lyrics",
-            "style_prompt": "style",
-            # mood and bpm intentionally omitted
-        }
+        input_file = str(tmp_path / "input.webm")
+        with open(input_file, "wb") as f:
+            f.write(b"dummy")
 
-        from pipeline import run_pipeline
-        with patch("pipeline.os.makedirs"):
-            await run_pipeline("input.webm", "pop")
+        result = await run_pipeline(input_file, "pop")
 
-        # Should use default bpm=120
-        mocks["lyria"].assert_called_once_with("style", 120)
+        assert result["mood"] == "neutral"
+        assert result["bpm"] == 120
