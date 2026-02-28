@@ -458,6 +458,85 @@
     }
     .action-btn.primary:hover{background:rgba(45,212,191,.18)}
 
+    /* ───── VINYL RECORD ───── */
+    .vinyl-section{
+      margin-top:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem;
+    }
+    .vinyl-wrap{
+      position:relative;width:200px;height:200px;
+    }
+    .vinyl-record{
+      width:200px;height:200px;border-radius:50%;
+      background:radial-gradient(circle at 50% 50%,
+        #1a1a1a 0%,#1a1a1a 15%,
+        #111 15.5%,#222 16%,#111 17%,
+        #222 20%,#111 21%,#222 24%,#111 25%,
+        #222 28%,#111 29%,#222 32%,#111 33%,
+        #1a1a1a 36%,#222 40%,#111 41%,#222 44%,
+        #111 45%,#222 48%,#111 49%,#222 52%,
+        #111 53%,#222 56%,#111 57%,#222 60%,
+        #111 61%,#1a1a1a 65%,
+        #222 70%,#111 71%,#222 74%,#111 75%,
+        #222 78%,#111 79%,#222 82%,#111 83%,
+        #222 86%,#111 87%,#222 90%,#111 91%,
+        #222 94%,#111 95%,#1a1a1a 100%
+      );
+      box-shadow:0 4px 40px rgba(0,0,0,.6),inset 0 0 30px rgba(0,0,0,.4);
+      animation:vinylSpin 4s linear infinite;
+      animation-play-state:paused;
+    }
+    .vinyl-record.spinning{animation-play-state:running}
+    .vinyl-record::after{
+      content:'';position:absolute;top:50%;left:50%;
+      width:50px;height:50px;border-radius:50%;
+      transform:translate(-50%,-50%);
+      background:linear-gradient(135deg,var(--red),#ff6b7a);
+      box-shadow:0 0 20px var(--red-g);
+    }
+    .vinyl-label{
+      position:absolute;top:50%;left:50%;
+      transform:translate(-50%,-50%);
+      width:70px;height:70px;border-radius:50%;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      z-index:2;pointer-events:none;
+    }
+    .vinyl-label .v-title{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:.45rem;font-weight:700;color:#fff;
+      text-align:center;line-height:1.2;
+      max-width:55px;overflow:hidden;
+      text-overflow:ellipsis;white-space:nowrap;
+    }
+    .vinyl-label .v-genre{
+      font-size:.35rem;color:rgba(255,255,255,.7);
+      text-transform:uppercase;letter-spacing:.05em;
+    }
+    @keyframes vinylSpin{to{transform:rotate(360deg)}}
+
+    .vinyl-info{text-align:center}
+    .vinyl-info h3{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:1.1rem;font-weight:700;margin-bottom:.25rem;
+    }
+    .vinyl-info p{font-size:.82rem;color:var(--t2);line-height:1.5}
+
+    .shopify-btn{
+      width:100%;padding:.85rem;border-radius:14px;border:none;
+      background:linear-gradient(135deg,#96bf48,#5a8a00);
+      color:#fff;font-size:.9rem;font-family:'Space Grotesk',sans-serif;
+      font-weight:700;cursor:pointer;transition:all .3s;
+      box-shadow:0 4px 20px rgba(150,191,72,.25);
+      display:flex;align-items:center;justify-content:center;gap:.5rem;
+    }
+    .shopify-btn:hover{transform:translateY(-1px);box-shadow:0 8px 32px rgba(150,191,72,.3)}
+    .shopify-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .shopify-btn .s-spinner{
+      display:none;width:18px;height:18px;border:2.5px solid rgba(255,255,255,.3);
+      border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;
+    }
+    .shopify-btn.loading .s-spinner{display:block}
+    .shopify-btn.loading .s-label{display:none}
+
     /* ───── GENRES SHOWCASE ───── */
     .genres-section{overflow:hidden}
     .genres-scroll{
@@ -705,6 +784,27 @@
           <button class="action-btn" onclick="copyLyrics()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             Copy Lyrics
+          </button>
+        </div>
+
+        <div class="vinyl-section" id="vinylSection">
+          <div class="vinyl-wrap">
+            <div class="vinyl-record" id="vinylDisc"></div>
+            <div class="vinyl-label">
+              <div class="v-title" id="vinylTitle">MemoMuse</div>
+              <div class="v-genre" id="vinylGenre">Track</div>
+            </div>
+          </div>
+          <div class="vinyl-info">
+            <h3>Press Your Vinyl</h3>
+            <p>Turn this track into a real vinyl record — shipped to your door.</p>
+          </div>
+          <button class="shopify-btn" id="shopifyBtn" onclick="publishToShopify()">
+            <div class="s-spinner"></div>
+            <span class="s-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              Buy as Vinyl — $24.99
+            </span>
           </button>
         </div>
       </div>
@@ -984,12 +1084,18 @@
       audio.onseeked = () => startLyricSync(audio);
 
       // Show metadata pills
+      trackMeta = data;
       const meta = $('trackMeta');
       meta.innerHTML = '';
       if (data.genre) meta.innerHTML += `<span class="meta-pill">Genre <span class="meta-val">${data.genre}</span></span>`;
       if (data.mood) meta.innerHTML += `<span class="meta-pill">Mood <span class="meta-val">${data.mood}</span></span>`;
       if (data.bpm) meta.innerHTML += `<span class="meta-pill">BPM <span class="meta-val">${data.bpm}</span></span>`;
       if (data.key) meta.innerHTML += `<span class="meta-pill">Key <span class="meta-val">${data.key}</span></span>`;
+
+      // Vinyl label
+      $('vinylTitle').textContent = data.song_title || 'MemoMuse';
+      $('vinylGenre').textContent = `${data.genre || 'Track'} • ${data.mood || ''}`;
+      syncVinyl(audio);
 
       setStatus('Your track is ready!', 'success');
     } catch (err) {
@@ -1007,7 +1113,7 @@
     if (!currentAudioUrl) return;
     const a = document.createElement('a');
     a.href = currentAudioUrl;
-    a.download = 'MemoMuse_Track.mp3';
+    a.download = `${(trackMeta.song_title || 'MemoMuse_Track').replace(/[^a-zA-Z0-9 ]/g, '').replace(/ /g, '_')}.mp3`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1021,6 +1127,67 @@
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
       setTimeout(() => { btn.innerHTML = orig; }, 2000);
     });
+  }
+
+  // ─── Vinyl spin sync ───
+  function syncVinyl(audioEl) {
+    const disc = $('vinylDisc');
+    if (!disc) return;
+    const update = () => {
+      if (audioEl.paused) disc.classList.remove('spinning');
+      else disc.classList.add('spinning');
+      requestAnimationFrame(update);
+    };
+    update();
+  }
+
+  // ─── Shopify integration ───
+  let shopifyConfig = null;
+  let trackMeta = {};
+
+  async function loadShopifyConfig() {
+    try {
+      const res = await fetch(`${API_URL}/api/config`);
+      shopifyConfig = await res.json();
+    } catch (e) { console.warn('No Shopify config'); }
+  }
+  loadShopifyConfig();
+
+  async function publishToShopify() {
+    const btn = $('shopifyBtn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+    const label = btn.querySelector('.s-label span') || btn.querySelector('.s-label');
+
+    try {
+      const res = await fetch(`${API_URL}/api/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          song_title: trackMeta.song_title || 'Untitled Track',
+          lyrics: trackMeta.lyrics || currentLyrics || '',
+          genre: trackMeta.genre || '',
+          mood: trackMeta.mood || '',
+          bpm: trackMeta.bpm || 120,
+          key: trackMeta.key || '',
+          audio_url: currentAudioUrl || '',
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        alert('Could not create product: ' + data.error);
+      } else if (data.product_url) {
+        if (label) label.textContent = 'Published! View in Store →';
+        window.open(data.product_url, '_blank');
+      }
+    } catch (err) {
+      console.error('Publish error:', err);
+      alert('Failed to publish — check the console.');
+    }
+
+    btn.classList.remove('loading');
+    btn.disabled = false;
   }
 </script>
 </body>

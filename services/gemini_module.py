@@ -37,6 +37,7 @@ Respond with ONLY valid JSON (no markdown):
 
 {{
   "contains_lyrics": true,
+  "song_title": "A catchy, creative song title (2-5 words). Make it memorable and fitting for the genre.",
   "cleaned_lyrics": "Full structured lyrics with [Verse 1], [Chorus], [Verse 2], [Chorus] labels. 16-24 lines total.",
   "style_prompt": "Detailed music production prompt: genre, exact BPM, mood, key, instruments (list specific ones), energy arc, production style. Be very specific.",
   "detected_genre": "refined genre",

@@ -14,8 +14,9 @@ def _get_client():
 
 def synthesize_vocals(lyrics: str, output_path: str = "temp/vocals.mp3") -> str:
     """Generate vocal track from lyrics using TTS."""
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
     audio = _get_client().text_to_speech.convert(
-        voice_id="21m00Tcm4TlvDq8ikWAM",
+        voice_id=voice_id,
         text=lyrics,
         model_id="eleven_multilingual_v2",
         voice_settings=VoiceSettings(
@@ -33,9 +34,10 @@ def synthesize_vocals(lyrics: str, output_path: str = "temp/vocals.mp3") -> str:
 
 def convert_speech_to_speech(audio_path: str, output_path: str = "temp/vocals.mp3") -> str:
     """Clean up raw voice recording via speech-to-speech."""
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
     with open(audio_path, "rb") as audio_file:
         audio = _get_client().speech_to_speech.convert(
-            voice_id="21m00Tcm4TlvDq8ikWAM",
+            voice_id=voice_id,
             audio=audio_file,
             model_id="eleven_multilingual_sts_v2",
         )

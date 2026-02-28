@@ -97,6 +97,7 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
 
     return {
         "output_path": output_path,
+        "song_title": gemini_result.get("song_title", "Untitled Track"),
         "lyrics": cleaned_lyrics,
         "mood": mood,
         "bpm": bpm,
