@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voicemail Copilot — MemoMuse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #090C10;
+      color: #DDE0EF;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1E2535; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2A3450; }
+
+    .font-syne { font-family: 'Syne', sans-serif; }
+    .font-mono-dm { font-family: 'DM Mono', 'Courier New', monospace; }
+
+    audio { accent-color: #00C875; }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(30, 37, 53, 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 37, 53, 0.3) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    @keyframes waveBar {
+      0%, 100% { transform: scaleY(0.22); }
+      50%       { transform: scaleY(1); }
+    }
+    @keyframes pulseRing {
+      0%   { transform: scale(1); opacity: 0.7; }
+      100% { transform: scale(3.6); opacity: 0; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(10px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .wave-bar {
+      animation: waveBar 1.4s ease-in-out infinite;
+      transform-origin: center bottom;
+    }
+    .wave-bar:nth-child(1) { animation-delay: 0s; }
+    .wave-bar:nth-child(2) { animation-delay: 0.12s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.24s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.36s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.24s; }
+    .wave-bar:nth-child(6) { animation-delay: 0.12s; }
+    .wave-bar:nth-child(7) { animation-delay: 0s; }
+
+    .pulse-ring { animation: pulseRing 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+    .slide-up   { animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .fade-in    { animation: fadeIn 0.22s ease both; }
+    .spinner    { animation: spin 0.75s linear infinite; }
+
+    /* Nav bar */
+    .nav-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      height: 40px;
+      background: rgba(9, 12, 16, 0.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #1E2535;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+    }
+    .nav-bar a { color: #00C875; font-size: 13px; text-decoration: none; }
+    .nav-bar a:hover { color: #00DC82; }
+    .nav-bar-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #DDE0EF; }
+
+    /* Layout */
+    #app-shell {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      padding-top: 40px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 296px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1E2535;
+      background: #0B0E14;
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      flex-shrink: 0;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid #1E2535;
+    }
+    .sidebar-header-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .logo-mark {
+      display: flex;
+      height: 28px;
+      width: 28px;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 200, 117, 0.2);
+      background: rgba(0, 200, 117, 0.08);
+    }
+    .live-indicator {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse-dot-wrap {
+      position: relative;
+      height: 6px;
+      width: 6px;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border-radius: 12px;
+      border: 2px dashed #1E2535;
+      background: #0F1318;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .upload-zone:hover { border-color: #2A3450; background: #141821; }
+    .upload-zone.dragging {
+      border-color: #00C875;
+      background: rgba(0, 200, 117, 0.05);
+      box-shadow: 0 0 24px rgba(0, 200, 117, 0.12);
+    }
+    .upload-zone.has-file { border-color: rgba(0, 200, 117, 0.35); background: rgba(0, 200, 117, 0.03); }
+    .upload-icon-wrap {
+      display: flex;
+      height: 40px;
+      width: 40px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #1E2535;
+      margin: 0 auto 8px;
+      transition: background 0.2s;
+    }
+    .upload-icon-wrap.has-file { background: rgba(0, 200, 117, 0.1); }
+
+    /* Buttons */
+    .btn-analyze {
+      margin-top: 12px;
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.15s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-analyze.active {
+      background: #00C875;
+      color: #090C10;
+      box-shadow: 0 0 20px rgba(0, 200, 117, 0.22);
+    }
+    .btn-analyze.active:hover {
+      background: #00DC82;
+      box-shadow: 0 0 28px rgba(0, 200, 117, 0.35);
+    }
+    .btn-analyze.inactive {
+      background: #1E2535;
+      color: #3D4260;
+      cursor: not-allowed;
+    }
+    .btn-demo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 8px;
+      border: 1px solid #1E2535;
+      background: #0F1318;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      color: #6B7490;
+      transition: all 0.15s;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-demo:hover { border-color: #2A3450; background: #141821; color: #DDE0EF; }
+
+    /* Ticket list panel */
+    .ticket-list-panel {
+      width: 268px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1E2535;
+      overflow: hidden;
+    }
+    .ticket-list-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1E2535;
+    }
+    .ticket-list-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* Ticket card */
+    .ticket-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid #1E2535;
+      background: #0F1318;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+      width: 100%;
+      padding: 0;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .ticket-card:hover { border-color: #2A3450; background: #141821; }
+    .ticket-card.selected {
+      border-color: rgba(0, 200, 117, 0.25);
+      background: #141821;
+      box-shadow: 0 0 0 1px rgba(0, 200, 117, 0.1);
+    }
+    .ticket-card-inner { padding: 12px 40px 12px 16px; }
+    .sentiment-bar {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 8px 0 0 8px;
+    }
+    .ticket-waveform {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-high   { background: rgba(239,68,68,0.1);    color: #f87171; }
+    .badge-medium { background: rgba(245,158,11,0.1);   color: #fbbf24; }
+    .badge-low    { background: #1E2535;                color: #6B7490; }
+
+    /* Detail panel */
+    .detail-panel { flex: 1; overflow: hidden; }
+    .detail-scroll {
+      height: 100%;
+      overflow-y: auto;
+      padding: 28px;
+      max-width: 768px;
+    }
+
+    /* Classification chips */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: 1px solid #1E2535;
+      background: #141821;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #DDE0EF;
+    }
+    .chip-red    { background: rgba(239,68,68,0.1);    color: #f87171; border-color: rgba(239,68,68,0.2); }
+    .chip-green  { background: rgba(0,200,117,0.1);    color: #00C875; border-color: rgba(0,200,117,0.2); }
+    .chip-amber  { background: rgba(245,158,11,0.1);   color: #fbbf24; border-color: rgba(245,158,11,0.2); }
+
+    /* Section label */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .section-label-text {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #6B7490;
+    }
+
+    /* Transcript */
+    .transcript-box {
+      font-family: 'DM Mono', 'Courier New', monospace;
+      border-radius: 8px;
+      border: 1px solid #1E2535;
+      background: #090C10;
+      padding: 14px 16px;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #6B7490;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .transcript-box.collapsed { overflow: hidden; max-height: 72px; }
+    .transcript-box.expanded  { overflow-y: auto; max-height: 500px; }
+    .transcript-fade {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 40px;
+      background: linear-gradient(to top, #090C10, transparent);
+      pointer-events: none;
+    }
+    .transcript-toggle {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #00C875;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: 'DM Sans', sans-serif;
+      transition: color 0.15s;
+    }
+    .transcript-toggle:hover { color: #00DC82; }
+
+    /* Reply textarea */
+    textarea {
+      width: 100%;
+      resize: none;
+      border-radius: 8px;
+      border: 1px solid #1E2535;
+      background: #0F1318;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #DDE0EF;
+      outline: none;
+      transition: all 0.15s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    textarea:focus {
+      border-color: rgba(0, 200, 117, 0.4);
+      box-shadow: 0 0 0 3px rgba(0, 200, 117, 0.07);
+    }
+
+    /* TTS button */
+    .btn-tts {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 200, 117, 0.25);
+      background: rgba(0, 200, 117, 0.08);
+      color: #00C875;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .btn-tts:hover { background: rgba(0, 200, 117, 0.15); border-color: rgba(0, 200, 117, 0.4); }
+    .btn-tts.inactive {
+      border-color: #1E2535;
+      background: #141821;
+      color: #6B7490;
+      cursor: not-allowed;
+    }
+
+    /* Error box */
+    .error-box {
+      margin-top: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      background: rgba(239, 68, 68, 0.08);
+      padding: 8px 12px;
+    }
+    .error-box p { font-size: 11px; color: #f87171; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <a href="/">← MemoMuse Studio</a>
+    <span class="nav-bar-title">Voicemail Copilot</span>
+  </div>
+  <div id="app-shell"></div>
+  <input type="file" id="vm-file-input" accept="audio/*" style="display:none" />
+
+  <script>
+    /* ── State ─────────────────────────────────────────────────────────── */
+    let tickets          = [];
+    let selectedId       = null;
+    let selectedFile     = null;
+    let audioPreviewUrl  = null;
+    let isAnalyzing      = false;
+    let analyzeError     = null;
+    let transcriptExpanded = false;
+    let currentReplyText = '';
+    let isGeneratingTTS  = false;
+    let ttsError         = null;
+
+    /* ── Demo data ─────────────────────────────────────────────────────── */
+    const DEMO_BASE = [
+      {
+        transcript: "Hi, this is Michael calling about order number 4821. I placed this order two weeks ago and it still hasn't arrived. The tracking hasn't updated in 5 days and I'm really frustrated. I needed this for an event this weekend. Please call me back as soon as possible at 555-0192. This is unacceptable.",
+        intent: "ORDER_STATUS",
+        sentiment: "NEGATIVE",
+        urgency: "HIGH",
+        summary: "Customer Michael is upset about order #4821 which is 2 weeks late with stalled tracking, needed for a weekend event.",
+        suggestedReply: "Hi Michael, we sincerely apologize for the delay with order #4821. We completely understand how frustrating this must be, especially with your event this weekend. We're escalating this to our fulfillment team immediately and will investigate the tracking issue. We'll call you back at 555-0192 within the hour with an update and will make this right. Thank you for your patience.",
+      },
+      {
+        transcript: "Hey, I bought a blue hoodie last month, order 3356, and it's way too small. The sizing chart on your website said I'd be a large but it fits like a medium. I'd like to return it for a larger size or a full refund. My name is Sarah and my email is sarah at gmail dot com.",
+        intent: "RETURN",
+        sentiment: "NEUTRAL",
+        urgency: "MEDIUM",
+        summary: "Sarah wants to return a hoodie from order #3356 due to sizing issues — the item runs small compared to the size chart.",
+        suggestedReply: "Hi Sarah, thank you for reaching out about order #3356. We're sorry the hoodie didn't fit as expected — sizing inconsistencies are something we take seriously. We'd be happy to process a free exchange for the next size up or issue a full refund, whichever you prefer. Please email us at support@store.com and we'll send a prepaid return label right away.",
+      },
+      {
+        transcript: "Hi there, I just placed an order for a gift for my daughter's birthday on the 15th. I'm wondering if standard shipping will get it there in time or if I need to upgrade to express. The order number is 5510. Thanks so much.",
+        intent: "GENERAL_QUESTION",
+        sentiment: "POSITIVE",
+        urgency: "MEDIUM",
+        summary: "Customer inquiring whether standard shipping for order #5510 will arrive by the 15th for a birthday gift.",
+        suggestedReply: "Hi! Thank you so much for your order #5510 — what a wonderful birthday gift! Based on current shipping times, standard shipping typically takes 5–7 business days. To ensure it arrives by the 15th, we'd recommend upgrading to express shipping (2–3 business days) if the date is within that window. Please reply here or call us and we'll upgrade your shipping at no extra charge to make sure it arrives in time!",
+      },
+    ];
+
+    const DEMO_BUTTONS = [
+      { emoji: "😤", label: "Angry Customer — Late Order", index: 0 },
+      { emoji: "📦", label: "Return Request",              index: 1 },
+      { emoji: "❓", label: "Shipping Question",            index: 2 },
+    ];
+
+    /* ── Config maps ────────────────────────────────────────────────────── */
+    const SENTIMENT_COLOR = { NEGATIVE: "#EF4444", POSITIVE: "#00C875", NEUTRAL: "#F59E0B" };
+
+    const URGENCY_CFG = {
+      HIGH:   { label: "High",   cls: "badge-high" },
+      MEDIUM: { label: "Medium", cls: "badge-medium" },
+      LOW:    { label: "Low",    cls: "badge-low" },
+    };
+    const INTENT_LABEL = {
+      ORDER_STATUS: "Order", RETURN: "Return",
+      GENERAL_QUESTION: "Question", COMPLAINT: "Complaint", OTHER: "Other",
+    };
+    const INTENT_CFG = {
+      ORDER_STATUS:     { label: "Order Status",     icon: "📦" },
+      RETURN:           { label: "Return Request",   icon: "↩️" },
+      GENERAL_QUESTION: { label: "General Question", icon: "❓" },
+      COMPLAINT:        { label: "Complaint",        icon: "⚠️" },
+      OTHER:            { label: "Other",            icon: "💬" },
+    };
+    const SENTIMENT_CFG = {
+      NEGATIVE: { label: "Negative", cls: "chip-red" },
+      POSITIVE: { label: "Positive", cls: "chip-green" },
+      NEUTRAL:  { label: "Neutral",  cls: "chip-amber" },
+    };
+    const URGENCY_CHIP = {
+      HIGH:   { label: "High Priority", cls: "chip-red" },
+      MEDIUM: { label: "Medium",        cls: "chip-amber" },
+      LOW:    { label: "Low Priority",  cls: "" },
+    };
+
+    /* ── Helpers ────────────────────────────────────────────────────────── */
+    function timeAgo(iso) {
+      const diff = Date.now() - new Date(iso).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1)  return "Just now";
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    }
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    /* ── Render ─────────────────────────────────────────────────────────── */
+    function render() {
+      const shell = document.getElementById('app-shell');
+      shell.innerHTML = tickets.length === 0
+        ? renderSidebar() + renderEmpty()
+        : renderSidebar() + renderTicketList() + renderDetailPanel();
+      attachListeners();
+    }
+
+    function renderSidebar() {
+      return `
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-header-top">
+              <div class="logo-mark">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 18.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13z" stroke="#00C875" stroke-width="1.5"/>
+                  <path d="M9.5 12c0-1.38 1.12-2.5 2.5-2.5" stroke="#00C875" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M14.5 12a2.5 2.5 0 01-2.5 2.5" stroke="#00C875" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="font-syne" style="font-size:14.5px;font-weight:700;color:#DDE0EF;letter-spacing:-0.02em;">Voicemail Copilot</span>
+              <div class="live-indicator">
+                <div class="pulse-dot-wrap">
+                  <div class="pulse-ring" style="position:absolute;inset:0;border-radius:50%;background:#00C875;"></div>
+                  <div style="position:relative;height:6px;width:6px;border-radius:50%;background:#00C875;"></div>
+                </div>
+                <span style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#00C875;">Live</span>
+              </div>
+            </div>
+            <p style="font-size:11px;color:#3D4260;padding-left:36px;margin:0;">AI-powered support for Shopify brands</p>
+          </div>
+
+          <div style="flex-shrink:0;padding:16px 16px 12px;">
+            <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3D4260;margin:0 0 10px;">Upload Voicemail</p>
+            <div class="upload-zone${selectedFile ? ' has-file' : ''}" id="upload-zone">
+              <div class="upload-icon-wrap${selectedFile ? ' has-file' : ''}">
+                ${selectedFile ? `
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12l2 2 4-4" stroke="#00C875" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="#00C875" stroke-width="1.5"/>
+                  </svg>
+                ` : `
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 15V3m0 0L8 7m4-4 4 4" stroke="#6B7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" stroke="#6B7490" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                `}
+              </div>
+              ${selectedFile ? `
+                <p style="font-size:12px;font-weight:600;color:#00C875;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 auto 4px;">${esc(selectedFile.name)}</p>
+                <p style="font-size:11px;color:#3D4260;margin:0;">Click to change file</p>
+              ` : `
+                <p style="font-size:12px;font-weight:600;color:#DDE0EF;margin:0 0 4px;">Drop audio or click to upload</p>
+                <p style="font-size:11px;color:#3D4260;margin:0;">MP3 · WAV · M4A · OGG</p>
+              `}
+            </div>
+
+            ${audioPreviewUrl ? `
+              <div class="fade-in" style="margin-top:10px;">
+                <audio controls src="${esc(audioPreviewUrl)}" style="width:100%;height:32px;border-radius:8px;"></audio>
+              </div>
+            ` : ''}
+
+            ${analyzeError ? `
+              <div class="error-box"><p>${esc(analyzeError)}</p></div>
+            ` : ''}
+
+            <button id="btn-analyze" class="btn-analyze ${selectedFile && !isAnalyzing ? 'active' : 'inactive'}" ${!selectedFile || isAnalyzing ? 'disabled' : ''}>
+              ${isAnalyzing ? `
+                <span class="spinner" style="display:inline-block;height:16px;width:16px;border-radius:50%;border:2px solid #3D4260;border-top-color:transparent;"></span>
+                Analyzing…
+              ` : `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Analyze Voicemail
+              `}
+            </button>
+          </div>
+
+          <div style="margin:0 16px;border-top:1px solid #1E2535;"></div>
+
+          <div style="flex-shrink:0;padding:14px 16px 12px;">
+            <p style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3D4260;margin:0 0 10px;">Demo Examples</p>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              ${DEMO_BUTTONS.map(({ emoji, label, index }) => `
+                <button class="btn-demo" data-demo="${index}">
+                  <span style="font-size:13px;">${emoji}</span>
+                  <span>${esc(label)}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div style="flex:1;"></div>
+
+          <div style="flex-shrink:0;border-top:1px solid #1E2535;padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="height:6px;width:6px;border-radius:50%;background:#00C875;"></div>
+              <span style="font-size:11px;color:#6B7490;">${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'} analyzed</span>
+            </div>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderEmpty() {
+      return `
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;" class="grid-bg">
+          <div class="fade-in" style="text-align:center;">
+            <div style="margin:0 auto 20px;display:flex;height:64px;width:64px;align-items:center;justify-content:center;border-radius:16px;border:1px solid #1E2535;background:#0F1318;">
+              <div style="display:flex;align-items:flex-end;gap:3px;height:28px;">
+                ${[5,9,13,9,15,9,5].map(h => `<div class="wave-bar" style="width:3px;border-radius:2px;background:#2A3450;height:${h}px;"></div>`).join('')}
+              </div>
+            </div>
+            <h2 class="font-syne" style="font-size:16px;font-weight:700;color:#DDE0EF;margin:0 0 6px;">No voicemails yet</h2>
+            <p style="font-size:12.5px;color:#3D4260;max-width:200px;margin:0 auto;line-height:1.6;">Upload a voicemail or try a demo example to get started</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTicketList() {
+      return `
+        <div class="ticket-list-panel">
+          <div class="ticket-list-header">
+            <h2 style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#6B7490;margin:0;">Inbox</h2>
+            <span style="border-radius:4px;background:#1E2535;padding:2px 6px;font-size:10px;font-weight:700;color:#6B7490;">${tickets.length}</span>
+          </div>
+          <div class="ticket-list-body">
+            ${tickets.map((t, i) => `
+              <div class="slide-up" style="animation-delay:${i * 0.04}s;">
+                ${renderTicketCard(t)}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTicketCard(ticket) {
+      const sc = SENTIMENT_COLOR[ticket.sentiment] || '#6B7490';
+      const urg = URGENCY_CFG[ticket.urgency] || URGENCY_CFG.LOW;
+      const intentL = INTENT_LABEL[ticket.intent] || ticket.intent;
+      const isSelected = ticket.id === selectedId;
+      return `
+        <button class="ticket-card${isSelected ? ' selected' : ''}" data-ticket-id="${esc(ticket.id)}">
+          <div class="sentiment-bar" style="background:${sc};"></div>
+          <div class="ticket-waveform">
+            ${[6,10,15,9,17,11,7].map(h => `<div style="width:2px;border-radius:2px;height:${h}px;background:${sc};"></div>`).join('')}
+          </div>
+          <div class="ticket-card-inner">
+            <p style="font-size:12.5px;font-weight:500;color:#DDE0EF;line-height:1.4;margin:0 0 8px;" class="line-clamp-2">${esc(ticket.summary)}</p>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="badge ${urg.cls}">${urg.label}</span>
+              <span style="font-size:10.5px;color:#6B7490;background:#141821;border:1px solid #1E2535;padding:2px 6px;border-radius:4px;">${esc(intentL)}</span>
+              <span style="font-size:10.5px;color:#3D4260;margin-left:auto;">${timeAgo(ticket.createdAt)}</span>
+            </div>
+          </div>
+        </button>
+      `;
+    }
+
+    function renderDetailPanel() {
+      const ticket = tickets.find(t => t.id === selectedId);
+      return `
+        <div class="detail-panel grid-bg">
+          ${ticket ? renderTicketDetail(ticket) : `
+            <div style="display:flex;height:100%;align-items:center;justify-content:center;">
+              <p style="font-size:13px;color:#3D4260;">Select a ticket to view details</p>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderTicketDetail(ticket) {
+      const intent    = INTENT_CFG[ticket.intent]    || { label: ticket.intent,    icon: '💬' };
+      const sentiment = SENTIMENT_CFG[ticket.sentiment] || { label: ticket.sentiment, cls: '' };
+      const urgency   = URGENCY_CHIP[ticket.urgency]  || { label: ticket.urgency,   cls: '' };
+      const reply     = currentReplyText;
+
+      return `
+        <div class="detail-scroll slide-up">
+          <div style="margin-bottom:20px;">
+            <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3D4260;margin:0 0 8px;">Voicemail Ticket</p>
+            <h2 class="font-syne" style="font-size:18px;font-weight:700;color:#DDE0EF;line-height:1.3;margin:0;">${esc(ticket.summary)}</h2>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;">
+            <span class="chip"><span>${intent.icon}</span>${esc(intent.label)}</span>
+            <span class="chip ${sentiment.cls}">${esc(sentiment.label)}</span>
+            <span class="chip ${urgency.cls}">${esc(urgency.label)}</span>
+          </div>
+
+          ${ticket.audioUrl ? `
+            <div style="margin-bottom:24px;">
+              <div class="section-label">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#6B7490" stroke-width="1.5"/><path d="M10 8.5l6 3.5-6 3.5V8.5z" fill="#6B7490"/></svg>
+                <span class="section-label-text">Original Voicemail</span>
+              </div>
+              <audio controls src="${esc(ticket.audioUrl)}" style="width:100%;height:36px;border-radius:8px;"></audio>
+            </div>
+          ` : ''}
+
+          <div style="margin-bottom:24px;">
+            <div class="section-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="#6B7490" stroke-width="1.5"/><path d="M8 9h8M8 12h8M8 15h4" stroke="#6B7490" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span class="section-label-text">Transcript</span>
+            </div>
+            <div>
+              <div class="transcript-box${transcriptExpanded ? ' expanded' : ' collapsed'}" id="transcript-box">
+                ${esc(ticket.transcript)}
+                ${!transcriptExpanded ? '<div class="transcript-fade"></div>' : ''}
+              </div>
+              <button class="transcript-toggle" id="transcript-toggle">
+                ${transcriptExpanded ? 'Show less ↑' : 'Show full transcript ↓'}
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:24px;">
+            <div class="section-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="#6B7490" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              <span class="section-label-text">Suggested Reply</span>
+            </div>
+            <textarea id="reply-textarea" rows="5" placeholder="Type your reply...">${esc(reply)}</textarea>
+
+            <div style="margin-top:12px;display:flex;align-items:center;gap:12px;">
+              <button id="btn-tts" class="btn-tts${isGeneratingTTS ? ' inactive' : ''}" ${isGeneratingTTS ? 'disabled' : ''} data-ticket-id="${esc(ticket.id)}">
+                ${isGeneratingTTS ? `
+                  <span class="spinner" style="display:inline-block;height:14px;width:14px;border-radius:50%;border:2px solid #6B7490;border-top-color:transparent;"></span>
+                  Generating voice…
+                ` : `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 18.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13z" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M9 9c0-1.657 1.343-3 3-3M15 12a3 3 0 01-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                  Generate Voice Reply
+                `}
+              </button>
+              ${ticket.replyAudioUrl && !isGeneratingTTS ? `
+                <span class="fade-in" style="font-size:11px;font-weight:500;color:#00C875;">✓ Ready</span>
+              ` : ''}
+            </div>
+
+            ${ttsError ? `<p style="margin-top:8px;font-size:11px;color:#f87171;">${esc(ttsError)}</p>` : ''}
+
+            ${ticket.replyAudioUrl ? `
+              <div class="fade-in" style="margin-top:16px;">
+                <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6B7490;margin:0 0 8px;">AI Voice Reply</p>
+                <audio controls src="${esc(ticket.replyAudioUrl)}" style="width:100%;height:36px;border-radius:8px;"></audio>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    /* ── Event listeners ────────────────────────────────────────────────── */
+    function attachListeners() {
+      const fileInput = document.getElementById('vm-file-input');
+
+      // Upload zone
+      const zone = document.getElementById('upload-zone');
+      if (zone) {
+        zone.addEventListener('click', () => fileInput.click());
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragging'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+        zone.addEventListener('drop', e => {
+          e.preventDefault();
+          zone.classList.remove('dragging');
+          const file = e.dataTransfer.files[0];
+          if (file && file.type.startsWith('audio/')) handleFileSelect(file);
+        });
+      }
+
+      fileInput.onchange = e => {
+        const file = e.target.files[0];
+        if (file) handleFileSelect(file);
+        fileInput.value = '';
+      };
+
+      // Analyze button
+      const btnAnalyze = document.getElementById('btn-analyze');
+      if (btnAnalyze) btnAnalyze.addEventListener('click', handleAnalyze);
+
+      // Demo buttons
+      document.querySelectorAll('.btn-demo').forEach(btn =>
+        btn.addEventListener('click', () => loadDemo(parseInt(btn.dataset.demo)))
+      );
+
+      // Ticket cards
+      document.querySelectorAll('.ticket-card').forEach(card =>
+        card.addEventListener('click', () => {
+          const newId = card.dataset.ticketId;
+          if (newId !== selectedId) {
+            selectedId = newId;
+            const t = tickets.find(x => x.id === newId);
+            if (t) {
+              currentReplyText = t.suggestedReply;
+              transcriptExpanded = false;
+              ttsError = null;
+              isGeneratingTTS = false;
+            }
+            render();
+          }
+        })
+      );
+
+      // Transcript toggle — no full re-render, just patch DOM
+      const toggle = document.getElementById('transcript-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', () => {
+          transcriptExpanded = !transcriptExpanded;
+          const box = document.getElementById('transcript-box');
+          if (box) {
+            box.className = `transcript-box ${transcriptExpanded ? 'expanded' : 'collapsed'}`;
+            const fade = box.querySelector('.transcript-fade');
+            if (transcriptExpanded && fade) fade.remove();
+            if (!transcriptExpanded && !fade) {
+              const d = document.createElement('div');
+              d.className = 'transcript-fade';
+              box.appendChild(d);
+            }
+          }
+          toggle.textContent = transcriptExpanded ? 'Show less ↑' : 'Show full transcript ↓';
+        });
+      }
+
+      // Reply textarea — sync state without re-render
+      const ta = document.getElementById('reply-textarea');
+      if (ta) ta.addEventListener('input', e => { currentReplyText = e.target.value; });
+
+      // TTS button
+      const btnTts = document.getElementById('btn-tts');
+      if (btnTts) {
+        btnTts.addEventListener('click', () => {
+          if (!isGeneratingTTS) handleGenerateVoice(btnTts.dataset.ticketId, currentReplyText);
+        });
+      }
+    }
+
+    /* ── Actions ────────────────────────────────────────────────────────── */
+    function handleFileSelect(file) {
+      selectedFile    = file;
+      audioPreviewUrl = URL.createObjectURL(file);
+      analyzeError    = null;
+      render();
+    }
+
+    async function handleAnalyze() {
+      if (!selectedFile || isAnalyzing) return;
+      isAnalyzing  = true;
+      analyzeError = null;
+      render();
+      try {
+        const form = new FormData();
+        form.append('file', selectedFile);
+        const res = await fetch('/api/voicemail/analyze', { method: 'POST', body: form });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.error ?? 'Analysis failed. Check your API key.');
+        }
+        const data   = await res.json();
+        const ticket = {
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          audioUrl: audioPreviewUrl,
+          ...data,
+        };
+        tickets.unshift(ticket);
+        selectedId         = ticket.id;
+        currentReplyText   = ticket.suggestedReply;
+        transcriptExpanded = false;
+        ttsError           = null;
+      } catch (err) {
+        analyzeError = err.message || 'Analysis failed. Check your API key.';
+      } finally {
+        isAnalyzing = false;
+        render();
+      }
+    }
+
+    function loadDemo(index) {
+      const ticket = {
+        ...DEMO_BASE[index],
+        id: `demo-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        audioUrl: '',
+      };
+      tickets.unshift(ticket);
+      selectedId         = ticket.id;
+      currentReplyText   = ticket.suggestedReply;
+      transcriptExpanded = false;
+      ttsError           = null;
+      isGeneratingTTS    = false;
+      render();
+    }
+
+    async function handleGenerateVoice(ticketId, replyText) {
+      isGeneratingTTS = true;
+      ttsError        = null;
+      render();
+      try {
+        const res = await fetch('/api/voicemail/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: replyText }),
+        });
+        if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
+        const buf  = await res.arrayBuffer();
+        const blob = new Blob([buf], { type: 'audio/mpeg' });
+        const url  = URL.createObjectURL(blob);
+        tickets    = tickets.map(t => t.id === ticketId ? { ...t, replyAudioUrl: url } : t);
+      } catch (err) {
+        ttsError = err.message || 'Voice generation failed';
+      } finally {
+        isGeneratingTTS = false;
+        render();
+      }
+    }
+
+    /* ── Init ───────────────────────────────────────────────────────────── */
+    render();
+  </script>
+</body>
+</html>

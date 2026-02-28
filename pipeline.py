@@ -59,12 +59,12 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
         vocal_task = asyncio.create_task(
             asyncio.to_thread(synthesize_vocals, cleaned_lyrics, vocal_path)
         )
-        print("      → Using TTS with generated lyrics")
+        print("      -> Using TTS with generated lyrics")
     else:
         vocal_task = asyncio.create_task(
             asyncio.to_thread(convert_speech_to_speech, input_path, vocal_path)
         )
-        print("      → Using STS to preserve hummed melody")
+        print("      -> Using STS to preserve hummed melody")
     inst_path = await instrumental_task
     vocal_path = await vocal_task
     print("[5/6] Audio generated")

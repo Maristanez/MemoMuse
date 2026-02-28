@@ -33,15 +33,21 @@ def synthesize_vocals(lyrics: str, output_path: str = "temp/vocals.mp3") -> str:
 
 
 def convert_speech_to_speech(audio_path: str, output_path: str = "temp/vocals.mp3") -> str:
-    """Clean up raw voice recording via speech-to-speech."""
+    """Clean up raw voice recording via speech-to-speech, falling back to TTS on quota errors."""
     voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
-    with open(audio_path, "rb") as audio_file:
-        audio = _get_client().speech_to_speech.convert(
-            voice_id=voice_id,
-            audio=audio_file,
-            model_id="eleven_multilingual_sts_v2",
-        )
-        with open(output_path, "wb") as f:
-            for chunk in audio:
-                f.write(chunk)
-    return output_path
+    try:
+        with open(audio_path, "rb") as audio_file:
+            audio = _get_client().speech_to_speech.convert(
+                voice_id=voice_id,
+                audio=audio_file,
+                model_id="eleven_multilingual_sts_v2",
+            )
+            with open(output_path, "wb") as f:
+                for chunk in audio:
+                    f.write(chunk)
+        return output_path
+    except Exception as e:
+        if "quota_exceeded" in str(e):
+            print("      STS quota exceeded, falling back to TTS")
+            return synthesize_vocals("[Instrumental - hum along]", output_path)
+        raise

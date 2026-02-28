@@ -32,8 +32,14 @@ def generate_instrumental(style_prompt: str, bpm: int = 120, output_path: str = 
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(_generate())
+    except TimeoutError as e:
+        loop.close()
+        raise RuntimeError("Lyria connection timed out. Check your GEMINI_API_KEY and network.") from e
     finally:
         loop.close()
+
+    if not audio_chunks:
+        raise RuntimeError("Lyria returned no audio. Check your GEMINI_API_KEY and that Lyria Realtime is enabled.")
 
     with wave.open(output_path, "w") as wav:
         wav.setnchannels(2)
