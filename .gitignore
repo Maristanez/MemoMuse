@@ -18,6 +18,7 @@ env/
 
 # Temp files
 temp/
+dummy.wav
 
 # IDE
 .vscode/
