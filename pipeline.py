@@ -7,7 +7,8 @@ from services.transcribe_module import transcribe_audio
 from services.backboard_module import store_session
 from services.featherless_module import refine_lyrics
 
-VOCAL_REDUCTION_DB = 1
+VOCAL_BOOST_DB = 6
+INSTRUMENTAL_CUT_DB = 6
 
 
 async def run_pipeline(input_path: str, genre: str) -> dict:
@@ -70,8 +71,16 @@ async def run_pipeline(input_path: str, genre: str) -> dict:
 
     # Step 6: Mix — layer vocals over instrumental
     instrumental = AudioSegment.from_file(inst_path)
-    vocal = AudioSegment.from_file(vocal_path) - VOCAL_REDUCTION_DB
-    instrumental = instrumental - 2
+    vocal = AudioSegment.from_file(vocal_path)
+
+    # Normalize both to -20 dBFS then apply relative balance
+    def normalize(seg, target_dbfs=-20.0):
+        change = target_dbfs - seg.dBFS
+        return seg.apply_gain(change)
+
+    instrumental = normalize(instrumental) - INSTRUMENTAL_CUT_DB
+    vocal = normalize(vocal) + VOCAL_BOOST_DB
+
     if len(vocal) > len(instrumental):
         vocal = vocal[: len(instrumental)]
     combined = instrumental.overlay(vocal, position=0)

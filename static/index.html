@@ -388,30 +388,60 @@
     }
     .meta-pill .meta-val{color:#fff}
 
-    .lyrics-section{
+    .lyrics-display{
       margin-top:1.25rem;
+      background:rgba(255,255,255,.02);border:1px solid var(--border);
+      border-radius:18px;padding:1.5rem;
+      position:relative;overflow:hidden;
+      max-height:280px;overflow-y:auto;
+      scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent;
     }
-    .lyrics-toggle{
-      display:flex;align-items:center;justify-content:space-between;
-      cursor:pointer;padding:.6rem 0;
+    .lyrics-display::-webkit-scrollbar{width:4px}
+    .lyrics-display::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+    .lyrics-display::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:30px;
+      background:linear-gradient(to bottom,rgba(5,5,7,.9),transparent);
+      pointer-events:none;z-index:2;
     }
-    .lyrics-toggle-label{
-      font-size:.72rem;font-weight:700;text-transform:uppercase;
-      letter-spacing:.1em;color:var(--t2);
+    .lyrics-display::after{
+      content:'';position:absolute;bottom:0;left:0;right:0;height:30px;
+      background:linear-gradient(to top,rgba(5,5,7,.9),transparent);
+      pointer-events:none;z-index:2;
+    }
+    .lyrics-label{
+      font-size:.68rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.12em;color:var(--t3);margin-bottom:.75rem;
       display:flex;align-items:center;gap:.4rem;
     }
-    .lyrics-toggle-label svg{transition:transform .3s}
-    .lyrics-toggle-label.open svg{transform:rotate(180deg)}
-    .lyrics-body{
-      max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.16,1,.3,1);
+    .lyrics-label .eq-bars{display:flex;gap:2px;align-items:end;height:12px}
+    .lyrics-label .eq-bars span{
+      width:2px;border-radius:1px;background:var(--red);
+      animation:eqBar .8s ease-in-out infinite alternate;
     }
-    .lyrics-body.open{max-height:400px}
-    .lyrics-text{
-      font-size:.88rem;line-height:1.8;color:var(--t1);
-      white-space:pre-line;padding:1rem 1.25rem;
-      background:rgba(255,255,255,.03);border:1px solid var(--border);
-      border-radius:14px;font-style:italic;
+    .lyrics-label .eq-bars span:nth-child(1){height:4px;animation-delay:0s}
+    .lyrics-label .eq-bars span:nth-child(2){height:8px;animation-delay:.15s}
+    .lyrics-label .eq-bars span:nth-child(3){height:6px;animation-delay:.3s}
+    .lyrics-label .eq-bars span:nth-child(4){height:10px;animation-delay:.1s}
+    .lyrics-label .eq-bars.paused span{animation-play-state:paused}
+    @keyframes eqBar{0%{height:3px}100%{height:12px}}
+    .lyric-line{
+      font-size:.95rem;line-height:2;color:var(--t3);
+      transition:all .4s cubic-bezier(.16,1,.3,1);
+      padding:2px 0;
     }
+    .lyric-line.active{
+      color:#fff;font-weight:500;
+      text-shadow:0 0 20px var(--red-g);
+      transform:scale(1.02);transform-origin:left center;
+    }
+    .lyric-line.past{color:var(--t2)}
+    .lyric-line.section-label{
+      font-size:.72rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.1em;color:var(--red);opacity:.6;
+      margin-top:.5rem;
+    }
+    .lyric-line.section-label.active{opacity:1;text-shadow:none}
+    .lyric-line.section-label.past{opacity:.4}
 
     .output-actions{
       display:flex;gap:.6rem;margin-top:1rem;
@@ -659,16 +689,12 @@
 
         <div class="track-meta" id="trackMeta"></div>
 
-        <div class="lyrics-section">
-          <div class="lyrics-toggle" onclick="toggleLyrics()">
-            <span class="lyrics-toggle-label" id="lyricsToggleLabel">
-              Lyrics
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </span>
+        <div class="lyrics-display" id="lyricsDisplay">
+          <div class="lyrics-label">
+            <div class="eq-bars" id="eqBars"><span></span><span></span><span></span><span></span></div>
+            Now Playing
           </div>
-          <div class="lyrics-body" id="lyricsBody">
-            <div class="lyrics-text" id="lyricsText"></div>
-          </div>
+          <div id="lyricsContainer"></div>
         </div>
 
         <div class="output-actions">
@@ -837,6 +863,68 @@
 
   let currentAudioUrl = null;
   let currentLyrics = '';
+  let lyricLines = [];
+  let lyricSyncRAF = null;
+
+  function buildLyrics(lyrics) {
+    const container = $('lyricsContainer');
+    container.innerHTML = '';
+    lyricLines = [];
+
+    const raw = lyrics.split('\n').filter(l => l.trim());
+    raw.forEach((line, i) => {
+      const div = document.createElement('div');
+      div.className = 'lyric-line';
+      const trimmed = line.trim();
+      if (/^\[.*\]$/.test(trimmed)) {
+        div.classList.add('section-label');
+        div.textContent = trimmed.replace(/[\[\]]/g, '');
+      } else {
+        div.textContent = trimmed;
+      }
+      container.appendChild(div);
+      lyricLines.push(div);
+    });
+  }
+
+  function startLyricSync(audioEl) {
+    if (lyricSyncRAF) cancelAnimationFrame(lyricSyncRAF);
+    const eqBars = $('eqBars');
+
+    function tick() {
+      if (!audioEl.duration || audioEl.paused) {
+        eqBars.classList.add('paused');
+        lyricSyncRAF = requestAnimationFrame(tick);
+        return;
+      }
+      eqBars.classList.remove('paused');
+      const progress = audioEl.currentTime / audioEl.duration;
+      const totalLines = lyricLines.length;
+      const activeIdx = Math.min(Math.floor(progress * totalLines), totalLines - 1);
+
+      lyricLines.forEach((el, i) => {
+        el.classList.remove('active', 'past');
+        if (i < activeIdx) el.classList.add('past');
+        else if (i === activeIdx) el.classList.add('active');
+      });
+
+      // Auto-scroll to keep active line centered
+      const activeLine = lyricLines[activeIdx];
+      if (activeLine) {
+        const display = $('lyricsDisplay');
+        const top = activeLine.offsetTop - display.offsetTop - display.clientHeight / 2 + 40;
+        display.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      }
+
+      lyricSyncRAF = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function stopLyricSync() {
+    if (lyricSyncRAF) { cancelAnimationFrame(lyricSyncRAF); lyricSyncRAF = null; }
+    $('eqBars').classList.add('paused');
+  }
 
   async function generate() {
     if (!audioBlob) return;
@@ -844,8 +932,7 @@
     genBtn.disabled = true;
     genBtn.classList.add('loading');
     $('playerSection').classList.remove('visible');
-    $('lyricsBody').classList.remove('open');
-    $('lyricsToggleLabel').classList.remove('open');
+    stopLyricSync();
 
     showSteps(true);
     activateStep('transcribe');
@@ -884,8 +971,17 @@
 
       const audio = $('outputAudio');
       audio.src = currentAudioUrl;
+
+      // Build lyric lines and start sync
+      buildLyrics(currentLyrics);
       $('playerSection').classList.add('visible');
       audio.play();
+      startLyricSync(audio);
+
+      // Re-sync on play/pause/seek
+      audio.onplay = () => startLyricSync(audio);
+      audio.onpause = () => $('eqBars').classList.add('paused');
+      audio.onseeked = () => startLyricSync(audio);
 
       // Show metadata pills
       const meta = $('trackMeta');
@@ -894,9 +990,6 @@
       if (data.mood) meta.innerHTML += `<span class="meta-pill">Mood <span class="meta-val">${data.mood}</span></span>`;
       if (data.bpm) meta.innerHTML += `<span class="meta-pill">BPM <span class="meta-val">${data.bpm}</span></span>`;
       if (data.key) meta.innerHTML += `<span class="meta-pill">Key <span class="meta-val">${data.key}</span></span>`;
-
-      // Set lyrics
-      $('lyricsText').textContent = currentLyrics;
 
       setStatus('Your track is ready!', 'success');
     } catch (err) {
@@ -908,13 +1001,6 @@
 
     genBtn.disabled = false;
     genBtn.classList.remove('loading');
-  }
-
-  function toggleLyrics() {
-    const body = $('lyricsBody');
-    const label = $('lyricsToggleLabel');
-    body.classList.toggle('open');
-    label.classList.toggle('open');
   }
 
   function downloadTrack() {
