@@ -11,7 +11,7 @@ def generate_instrumental(style_prompt: str, bpm: int = 120, output_path: str = 
         async with client.aio.live.music.connect(model="models/lyria-realtime-exp") as session:
             await session.set_weighted_prompts([types.WeightedPrompt(text=style_prompt, weight=1.0)])
             await session.set_music_generation_config(
-                types.MusicGenerationConfig(bpm=bpm, temperature=1.0, guidance=3.5)
+                types.LiveMusicGenerationConfig(bpm=bpm, temperature=1.0, guidance=3.5)
             )
             await session.play()
 
