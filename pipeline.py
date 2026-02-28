@@ -10,7 +10,7 @@ from services.featherless_module import refine_lyrics
 VOCAL_REDUCTION_DB = 3
 
 
-async def run_pipeline(input_path: str, genre: str) -> str:
+async def run_pipeline(input_path: str, genre: str) -> dict:
     os.makedirs("temp", exist_ok=True)
     run_id = uuid.uuid4().hex[:8]
 
@@ -74,4 +74,11 @@ async def run_pipeline(input_path: str, genre: str) -> str:
         except OSError:
             pass
 
-    return output_path
+    return {
+        "output_path": output_path,
+        "lyrics": cleaned_lyrics,
+        "mood": mood,
+        "bpm": bpm,
+        "genre": gemini_result.get("detected_genre", genre),
+        "key": gemini_result.get("key", ""),
+    }

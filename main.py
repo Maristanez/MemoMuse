@@ -26,11 +26,27 @@ async def generate(audio: UploadFile = File(...), genre: str = Form(default="pop
     with open(input_path, "wb") as f:
         f.write(await audio.read())
     try:
-        output_path = await run_pipeline(input_path, genre)
-        return FileResponse(output_path, media_type="audio/mpeg", filename="output.mp3")
+        result = await run_pipeline(input_path, genre)
+        filename = os.path.basename(result["output_path"])
+        return JSONResponse({
+            "audio_url": f"/audio/{filename}",
+            "lyrics": result["lyrics"],
+            "mood": result["mood"],
+            "bpm": result["bpm"],
+            "genre": result["genre"],
+            "key": result["key"],
+        })
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/audio/{filename}")
+async def serve_audio(filename: str):
+    path = f"temp/{filename}"
+    if not os.path.exists(path):
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+    return FileResponse(path, media_type="audio/mpeg", filename="MemoMuse_Track.mp3")
 
 
 @app.get("/")
