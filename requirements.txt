@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+pydub
+aiohttp
+google-generativeai
+google-genai
+elevenlabs
+openai-whisper
+requests
+python-multipart
+# Optional: basic-pitch audiocraft
