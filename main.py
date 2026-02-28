@@ -1,13 +1,14 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()  # must run before importing pipeline (service modules read env at import time)
+
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from dotenv import load_dotenv
 from pipeline import run_pipeline
-import os, uuid
-
-load_dotenv()
+import uuid
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
