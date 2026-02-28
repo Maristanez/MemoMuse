@@ -3,6 +3,8 @@
 import os
 from unittest.mock import patch, MagicMock
 
+from elevenlabs import VoiceSettings
+
 from services.elevenlabs_module import synthesize_vocals, convert_speech_to_speech
 
 
@@ -20,6 +22,12 @@ class TestSynthesizeVocals:
             voice_id="21m00Tcm4TlvDq8ikWAM",
             text="test lyrics",
             model_id="eleven_multilingual_v2",
+            voice_settings=VoiceSettings(
+                stability=0.3,
+                similarity_boost=0.75,
+                style=0.45,
+                use_speaker_boost=True,
+            ),
         )
 
     @patch("services.elevenlabs_module._get_client")
