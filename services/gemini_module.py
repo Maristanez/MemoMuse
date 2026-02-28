@@ -1,10 +1,17 @@
-import google.generativeai as genai
 import os, json
+from google import genai
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    return _client
+
 
 def get_gemini_analysis(raw_transcript: str, genre: str) -> dict:
-    model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = f"""You are a music producer AI assistant.
 
 A musician recorded a rough voice memo. Transcription:
@@ -23,10 +30,14 @@ Respond with ONLY valid JSON (no markdown):
   "key": "C minor"
 }}"""
 
-    response = model.generate_content(prompt)
+    response = _get_client().models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
-        if text.startswith("json"): text = text[4:]
+        if text.startswith("json"):
+            text = text[4:]
         text = text.strip()
     return json.loads(text)
