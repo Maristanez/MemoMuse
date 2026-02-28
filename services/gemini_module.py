@@ -4,7 +4,7 @@ import os, json
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def get_gemini_analysis(raw_transcript: str, genre: str) -> dict:
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash-001")
     prompt = f"""You are a music producer AI assistant.
 
 A musician recorded a rough voice memo. Transcription:
