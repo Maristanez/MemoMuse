@@ -3,106 +3,815 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MemoMuse</title>
+  <title>MemoMuse — Voice to Music</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',-apple-system,sans-serif;background:linear-gradient(135deg,#0f0f0f,#1a1a2e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
-    .logo{font-size:3rem;margin-bottom:.25rem}
-    h1{font-size:2.2rem;margin-bottom:.5rem;letter-spacing:-.02em}
-    p.subtitle{color:#888;margin-bottom:2rem;font-size:1.1rem}
-    .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2rem;max-width:480px;width:100%}
-    select,button{padding:.75rem 1.5rem;border-radius:10px;border:none;font-size:1rem;cursor:pointer;margin:.5rem;transition:all .2s}
-    select{background:#1e1e2e;color:#fff;border:1px solid #333}
-    #recordBtn{background:#e63946;color:#fff;font-weight:600;min-width:180px}
-    #recordBtn:hover{background:#c1121f}
-    #recordBtn.recording{background:#666;animation:pulse 1.5s infinite}
-    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.4)}50%{box-shadow:0 0 0 12px rgba(230,57,70,0)}}
-    #generateBtn{background:#2a9d8f;color:#fff;font-weight:600;min-width:180px}
-    #generateBtn:hover{background:#21867a}
-    #generateBtn:disabled{background:#333;cursor:not-allowed}
-    #status{margin-top:1.5rem;color:#aaa;font-size:.95rem;text-align:center;min-height:1.5em}
-    audio{margin-top:1.5rem;width:100%;border-radius:8px}
-    .controls{display:flex;flex-wrap:wrap;justify-content:center;gap:.25rem}
-    .sponsors{margin-top:2rem;color:#555;font-size:.75rem;text-align:center}
-    .waveform{display:none;margin-top:1rem;height:40px;background:rgba(230,57,70,.1);border-radius:8px;overflow:hidden}
-    .waveform.active{display:flex;align-items:center;justify-content:center}
-    .waveform .bar{width:3px;margin:0 2px;background:#e63946;border-radius:2px;animation:wave .8s ease-in-out infinite}
-    @keyframes wave{0%,100%{height:8px}50%{height:30px}}
+    html{scroll-behavior:smooth}
+    :root{
+      --red:#e63946;--red-g:rgba(230,57,70,.35);
+      --teal:#2dd4bf;--teal-g:rgba(45,212,191,.25);
+      --purple:#a78bfa;--purple-g:rgba(167,139,250,.2);
+      --amber:#f59e0b;--amber-g:rgba(245,158,11,.2);
+      --bg:#050507;
+      --surface:rgba(255,255,255,.03);
+      --border:rgba(255,255,255,.07);
+      --t1:#f5f5f5;--t2:#9ca3af;--t3:#4b5563;
+    }
+    body{
+      font-family:'Inter',system-ui,sans-serif;
+      background:var(--bg);color:var(--t1);overflow-x:hidden;
+    }
+
+    /* ───── NAV ───── */
+    nav{
+      position:fixed;top:0;left:0;width:100%;z-index:100;
+      padding:1.25rem 2rem;
+      display:flex;align-items:center;justify-content:space-between;
+      background:rgba(5,5,7,.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      transition:all .3s;
+    }
+    .nav-logo{
+      font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.3rem;
+      display:flex;align-items:center;gap:.6rem;letter-spacing:-.02em;
+    }
+    .nav-logo .icon{
+      width:32px;height:32px;border-radius:8px;
+      background:linear-gradient(135deg,var(--red),#ff6b7a);
+      display:flex;align-items:center;justify-content:center;font-size:.9rem;
+    }
+    .nav-links{display:flex;gap:2rem}
+    .nav-links a{
+      color:var(--t2);font-size:.85rem;text-decoration:none;font-weight:500;
+      transition:color .2s;position:relative;
+    }
+    .nav-links a:hover{color:#fff}
+    .nav-cta{
+      padding:.55rem 1.3rem;border-radius:10px;border:none;
+      background:var(--red);color:#fff;font-size:.85rem;font-family:inherit;font-weight:600;
+      cursor:pointer;transition:all .25s;
+    }
+    .nav-cta:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--red-g)}
+
+    /* ───── HERO ───── */
+    .hero{
+      min-height:100vh;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      text-align:center;padding:8rem 2rem 6rem;
+      position:relative;
+    }
+    .hero-glow{
+      position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;
+    }
+    .hero-glow .orb{
+      position:absolute;border-radius:50%;filter:blur(100px);
+      animation:float 14s ease-in-out infinite alternate;
+    }
+    .hero-glow .orb:nth-child(1){
+      width:600px;height:600px;background:rgba(230,57,70,.15);
+      top:-20%;left:-10%;
+    }
+    .hero-glow .orb:nth-child(2){
+      width:500px;height:500px;background:rgba(45,212,191,.1);
+      bottom:-15%;right:-10%;animation-delay:5s;
+    }
+    .hero-glow .orb:nth-child(3){
+      width:300px;height:300px;background:rgba(167,139,250,.1);
+      top:30%;left:50%;animation-delay:8s;
+    }
+    @keyframes float{
+      0%{transform:translate(0,0) scale(1)}
+      100%{transform:translate(60px,40px) scale(1.15)}
+    }
+
+    .hero-badge{
+      display:inline-flex;align-items:center;gap:.5rem;
+      padding:.45rem 1rem;border-radius:99px;
+      background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.2);
+      color:var(--red);font-size:.78rem;font-weight:600;
+      margin-bottom:2rem;letter-spacing:.03em;
+      text-transform:uppercase;
+      animation:fadeIn .8s ease;
+    }
+    .hero-badge .pulse-dot{
+      width:7px;height:7px;border-radius:50%;background:var(--red);
+      animation:pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+    .hero h1{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(2.8rem,7vw,5.5rem);font-weight:700;
+      line-height:1.05;letter-spacing:-.04em;
+      margin-bottom:1.5rem;position:relative;z-index:1;
+      animation:fadeUp .8s ease;
+    }
+    .hero h1 .gradient{
+      background:linear-gradient(135deg,var(--red),var(--purple),var(--teal));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .hero .subtitle{
+      font-size:clamp(1rem,2.5vw,1.3rem);color:var(--t2);
+      max-width:540px;line-height:1.6;margin-bottom:3rem;
+      animation:fadeUp .8s ease .15s both;
+    }
+    .hero-actions{
+      display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;
+      animation:fadeUp .8s ease .3s both;
+    }
+    .btn-primary{
+      padding:.9rem 2rem;border-radius:14px;border:none;
+      background:linear-gradient(135deg,var(--red),#ff4757);
+      color:#fff;font-size:1rem;font-family:inherit;font-weight:600;
+      cursor:pointer;transition:all .3s;
+      box-shadow:0 4px 24px var(--red-g);
+      display:flex;align-items:center;gap:.5rem;
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 36px var(--red-g)}
+    .btn-secondary{
+      padding:.9rem 2rem;border-radius:14px;
+      border:1px solid var(--border);background:var(--surface);
+      color:#fff;font-size:1rem;font-family:inherit;font-weight:500;
+      cursor:pointer;transition:all .3s;
+      backdrop-filter:blur(12px);
+    }
+    .btn-secondary:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
+
+    .hero-visual{
+      margin-top:5rem;position:relative;z-index:1;
+      width:100%;max-width:700px;
+      animation:fadeUp 1s ease .45s both;
+    }
+    .waveform-art{
+      display:flex;align-items:end;justify-content:center;gap:3px;
+      height:100px;padding:0 2rem;
+    }
+    .waveform-art .bar{
+      width:4px;border-radius:4px;
+      background:linear-gradient(to top,var(--red),var(--purple));
+      animation:artWave 2s ease-in-out infinite;
+      opacity:.6;
+    }
+    @keyframes artWave{0%,100%{height:15%}50%{height:90%}}
+
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ───── SECTION COMMONS ───── */
+    section{padding:7rem 2rem;position:relative}
+    .section-label{
+      font-size:.72rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.15em;color:var(--red);margin-bottom:1rem;
+    }
+    .section-title{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:clamp(2rem,4vw,3rem);font-weight:700;
+      letter-spacing:-.03em;line-height:1.15;margin-bottom:1rem;
+    }
+    .section-sub{color:var(--t2);font-size:1.05rem;line-height:1.7;max-width:560px}
+    .section-center{text-align:center;display:flex;flex-direction:column;align-items:center}
+
+    /* ───── HOW IT WORKS ───── */
+    .how-grid{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:1.5rem;margin-top:3.5rem;max-width:1000px;width:100%;
+    }
+    .how-card{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:20px;padding:2rem 1.5rem;
+      transition:all .35s;position:relative;overflow:hidden;
+    }
+    .how-card:hover{
+      border-color:rgba(255,255,255,.12);
+      transform:translateY(-4px);
+      box-shadow:0 8px 40px rgba(0,0,0,.3);
+    }
+    .how-card .num{
+      font-family:'Space Grotesk',sans-serif;
+      font-size:3.5rem;font-weight:700;
+      line-height:1;margin-bottom:.75rem;
+      background:linear-gradient(135deg,var(--red),transparent 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      opacity:.5;
+    }
+    .how-card:nth-child(2) .num{
+      background:linear-gradient(135deg,var(--purple),transparent 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .how-card:nth-child(3) .num{
+      background:linear-gradient(135deg,var(--teal),transparent 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .how-card:nth-child(4) .num{
+      background:linear-gradient(135deg,var(--amber),transparent 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .how-card h3{font-size:1.1rem;font-weight:600;margin-bottom:.5rem}
+    .how-card p{color:var(--t2);font-size:.88rem;line-height:1.6}
+    .how-card .glow-line{
+      position:absolute;bottom:0;left:0;width:100%;height:2px;
+      background:linear-gradient(90deg,transparent,var(--red),transparent);
+      opacity:0;transition:opacity .35s;
+    }
+    .how-card:hover .glow-line{opacity:1}
+    .how-card:nth-child(2) .glow-line{background:linear-gradient(90deg,transparent,var(--purple),transparent)}
+    .how-card:nth-child(3) .glow-line{background:linear-gradient(90deg,transparent,var(--teal),transparent)}
+    .how-card:nth-child(4) .glow-line{background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+
+    /* ───── STUDIO SECTION ───── */
+    #studio{
+      min-height:100vh;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      padding:6rem 2rem;
+    }
+    .studio-card{
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--border);
+      border-radius:28px;padding:3rem;width:100%;max-width:600px;
+      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      box-shadow:0 8px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+      margin-top:3rem;position:relative;overflow:hidden;
+    }
+    .studio-card::before{
+      content:'';position:absolute;top:-1px;left:20%;right:20%;height:1px;
+      background:linear-gradient(90deg,transparent,rgba(230,57,70,.4),transparent);
+    }
+
+    .genre-grid{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1.75rem;
+    }
+    .genre-chip{
+      padding:.65rem .5rem;border-radius:12px;
+      background:rgba(255,255,255,.04);border:1px solid var(--border);
+      color:var(--t2);font-size:.78rem;font-family:inherit;font-weight:500;
+      cursor:pointer;transition:all .25s;text-align:center;
+    }
+    .genre-chip:hover{border-color:rgba(255,255,255,.15);color:#fff;background:rgba(255,255,255,.07)}
+    .genre-chip.selected{
+      border-color:var(--red);color:#fff;
+      background:rgba(230,57,70,.12);
+      box-shadow:0 0 20px rgba(230,57,70,.15);
+    }
+
+    .record-area{
+      display:flex;flex-direction:column;align-items:center;
+      padding:2rem 0;gap:1rem;
+    }
+    .big-record-btn{
+      width:88px;height:88px;border-radius:50%;border:none;
+      background:linear-gradient(135deg,var(--red),#ff4757);
+      color:#fff;font-size:1.6rem;cursor:pointer;
+      transition:all .3s;position:relative;
+      box-shadow:0 4px 30px var(--red-g);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .big-record-btn::before{
+      content:'';position:absolute;inset:-6px;border-radius:50%;
+      border:2px solid rgba(230,57,70,.25);
+      transition:all .3s;
+    }
+    .big-record-btn:hover{transform:scale(1.05);box-shadow:0 8px 40px var(--red-g)}
+    .big-record-btn:hover::before{inset:-10px;border-color:rgba(230,57,70,.35)}
+    .big-record-btn.recording{
+      background:linear-gradient(135deg,#374151,#4b5563);
+      box-shadow:0 4px 20px rgba(0,0,0,.4);
+      animation:recording-pulse 2s ease-in-out infinite;
+    }
+    .big-record-btn.recording::before{
+      border-color:var(--red);animation:ring-expand 2s ease-in-out infinite;
+    }
+    @keyframes recording-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+    @keyframes ring-expand{0%{inset:-6px;opacity:1}100%{inset:-24px;opacity:0}}
+    .record-label{font-size:.85rem;color:var(--t2);font-weight:500}
+
+    .live-viz{
+      width:100%;height:64px;border-radius:16px;
+      background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+      display:flex;align-items:center;justify-content:center;gap:2px;
+      padding:0 2rem;margin:1rem 0 1.5rem;
+      transition:all .4s;overflow:hidden;
+    }
+    .live-viz.active{background:rgba(230,57,70,.04);border-color:rgba(230,57,70,.12)}
+    .live-viz .vbar{
+      width:3px;border-radius:3px;
+      background:linear-gradient(to top,var(--red),var(--purple));
+      height:4px;transition:height .1s ease;flex-shrink:0;
+    }
+    .live-viz.active .vbar{animation:vizWave .5s ease-in-out infinite}
+    @keyframes vizWave{0%,100%{height:4px}50%{height:48px}}
+
+    .gen-btn{
+      width:100%;padding:1rem;border-radius:16px;border:none;
+      background:linear-gradient(135deg,var(--teal),#14b8a6);
+      color:#064e3b;font-size:1rem;font-family:'Space Grotesk',sans-serif;
+      font-weight:700;cursor:pointer;transition:all .3s;
+      box-shadow:0 4px 24px var(--teal-g);
+      display:flex;align-items:center;justify-content:center;gap:.6rem;
+      letter-spacing:-.01em;
+    }
+    .gen-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 36px var(--teal-g)}
+    .gen-btn:disabled{
+      background:rgba(255,255,255,.05);color:var(--t3);
+      box-shadow:none;cursor:not-allowed;
+    }
+    .gen-btn .spinner{
+      display:none;width:20px;height:20px;border:2.5px solid rgba(6,78,59,.25);
+      border-top-color:#064e3b;border-radius:50%;animation:spin .7s linear infinite;
+    }
+    .gen-btn.loading .spinner{display:block}
+    .gen-btn.loading .btn-label{display:none}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .pipeline-steps{
+      display:flex;gap:.75rem;justify-content:center;
+      margin-top:1.25rem;flex-wrap:wrap;display:none;
+    }
+    .pipeline-steps.visible{display:flex}
+    .pstep{
+      display:flex;align-items:center;gap:.35rem;
+      font-size:.72rem;font-weight:600;color:var(--t3);
+      transition:all .3s;
+    }
+    .pstep.active{color:var(--t2)}
+    .pstep.done{color:var(--teal)}
+    .pstep .pdot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--t3);transition:all .3s;
+    }
+    .pstep.active .pdot{background:var(--t2);box-shadow:0 0 10px rgba(255,255,255,.2)}
+    .pstep.done .pdot{background:var(--teal);box-shadow:0 0 10px var(--teal-g)}
+    .pstep-line{width:20px;height:1px;background:var(--t3);flex-shrink:0}
+
+    .status-text{
+      margin-top:1.25rem;color:var(--t2);font-size:.85rem;
+      text-align:center;min-height:1.4em;
+      transition:color .3s;line-height:1.5;
+    }
+    .status-text.success{color:var(--teal)}
+    .status-text.error{color:var(--red)}
+
+    .output-player{
+      margin-top:2rem;width:100%;display:none;
+      animation:slideUp .6s cubic-bezier(.16,1,.3,1);
+    }
+    .output-player.visible{display:block}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .output-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:.75rem;
+    }
+    .output-tag{
+      font-size:.7rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.12em;color:var(--teal);
+      display:flex;align-items:center;gap:.4rem;
+    }
+    .output-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--teal)}
+    .player-box{
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;padding:1rem 1.25rem;
+    }
+    .player-box audio{
+      width:100%;height:40px;border-radius:8px;
+      filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(1.1);
+    }
+
+    /* ───── GENRES SHOWCASE ───── */
+    .genres-section{overflow:hidden}
+    .genres-scroll{
+      display:flex;gap:1rem;margin-top:3rem;
+      animation:scroll-x 30s linear infinite;
+      width:max-content;
+    }
+    .genre-tag{
+      padding:.7rem 1.5rem;border-radius:99px;
+      background:var(--surface);border:1px solid var(--border);
+      color:var(--t2);font-size:.9rem;font-weight:500;
+      white-space:nowrap;transition:all .3s;flex-shrink:0;
+    }
+    .genre-tag:nth-child(odd){border-color:rgba(230,57,70,.15);color:rgba(230,57,70,.7)}
+    .genre-tag:nth-child(3n){border-color:rgba(167,139,250,.15);color:rgba(167,139,250,.7)}
+    .genre-tag:nth-child(4n){border-color:rgba(45,212,191,.15);color:rgba(45,212,191,.7)}
+    @keyframes scroll-x{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+    /* ───── TECH STACK ───── */
+    .tech-grid{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:1rem;margin-top:3rem;max-width:800px;width:100%;
+    }
+    .tech-card{
+      padding:1.5rem;border-radius:16px;
+      background:var(--surface);border:1px solid var(--border);
+      transition:all .3s;text-align:center;
+    }
+    .tech-card:hover{border-color:rgba(255,255,255,.12);transform:translateY(-2px)}
+    .tech-card .tech-icon{font-size:1.8rem;margin-bottom:.6rem}
+    .tech-card .tech-name{font-size:.85rem;font-weight:600;margin-bottom:.25rem}
+    .tech-card .tech-role{font-size:.75rem;color:var(--t2)}
+
+    /* ───── FOOTER ───── */
+    footer{
+      padding:3rem 2rem;text-align:center;
+      border-top:1px solid var(--border);
+    }
+    footer .f-logo{
+      font-family:'Space Grotesk',sans-serif;font-weight:700;
+      font-size:1.1rem;margin-bottom:.5rem;
+    }
+    footer p{color:var(--t3);font-size:.8rem}
+
+    /* ───── SCROLL ANIMATIONS ───── */
+    .reveal{opacity:0;transform:translateY(40px);transition:all .7s cubic-bezier(.16,1,.3,1)}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+
+    /* ───── RESPONSIVE ───── */
+    @media(max-width:640px){
+      nav{padding:1rem}
+      .nav-links{display:none}
+      .genre-grid{grid-template-columns:repeat(2,1fr)}
+      .how-grid{grid-template-columns:1fr}
+      .studio-card{padding:2rem 1.5rem}
+      .tech-grid{grid-template-columns:repeat(2,1fr)}
+    }
   </style>
 </head>
 <body>
-  <div class="logo">🎵</div>
-  <h1>MemoMuse</h1>
-  <p class="subtitle">Hum your idea. Get a produced track.</p>
-  <div class="card">
-    <div class="controls">
-      <select id="genreSelect">
-        <option value="pop">Pop</option>
-        <option value="lo-fi hip hop">Lo-Fi Hip Hop</option>
-        <option value="hip hop">Hip Hop</option>
-        <option value="cinematic">Cinematic</option>
-        <option value="r&b">R&B</option>
-        <option value="indie folk">Indie Folk</option>
-        <option value="electronic">Electronic</option>
-        <option value="jazz">Jazz</option>
-      </select>
-      <button id="recordBtn" onclick="toggleRecord()">🎙 Start Recording</button>
-      <button id="generateBtn" onclick="generate()" disabled>✨ Generate Track</button>
-    </div>
-    <div class="waveform" id="waveform">
-      <div class="bar" style="animation-delay:0s"></div>
-      <div class="bar" style="animation-delay:.1s"></div>
-      <div class="bar" style="animation-delay:.2s"></div>
-      <div class="bar" style="animation-delay:.3s"></div>
-      <div class="bar" style="animation-delay:.4s"></div>
-      <div class="bar" style="animation-delay:.3s"></div>
-      <div class="bar" style="animation-delay:.2s"></div>
-      <div class="bar" style="animation-delay:.1s"></div>
-    </div>
-    <p id="status">Press record and hum your idea.</p>
-    <audio id="outputAudio" controls style="display:none;"></audio>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="icon">🎵</div>
+    MemoMuse
   </div>
-  <div class="sponsors">Powered by ElevenLabs • Backboard.io • Google Gemini • Featherless AI • Pianofi</div>
-  <script>
-    let mediaRecorder,audioChunks=[],audioBlob=null;
-    const API_URL=window.location.origin;
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#studio">Studio</a>
+    <a href="#tech">Built With</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('studio').scrollIntoView({behavior:'smooth'})">
+    Try It Now
+  </button>
+</nav>
 
-    async function toggleRecord(){
-      const btn=document.getElementById("recordBtn"),wave=document.getElementById("waveform");
-      if(mediaRecorder&&mediaRecorder.state==="recording"){
-        mediaRecorder.stop();btn.textContent="🎙 Start Recording";btn.classList.remove("recording");wave.classList.remove("active");return;
-      }
-      try{
-        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-        mediaRecorder=new MediaRecorder(stream);audioChunks=[];
-        mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
-        mediaRecorder.onstop=()=>{
-          audioBlob=new Blob(audioChunks,{type:"audio/webm"});
-          document.getElementById("generateBtn").disabled=false;
-          document.getElementById("status").textContent="Recording saved! Ready to generate.";
-          stream.getTracks().forEach(t=>t.stop());
-        };
-        mediaRecorder.start();btn.textContent="⏹ Stop Recording";btn.classList.add("recording");wave.classList.add("active");
-        document.getElementById("status").textContent="Recording... hum your idea!";
-      }catch(err){document.getElementById("status").textContent="Mic access denied.";}
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow">
+    <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  </div>
+
+  <div class="hero-badge"><span class="pulse-dot"></span> ListenHacks 2025</div>
+
+  <h1>
+    Your Voice.<br>
+    <span class="gradient">Our Producer.</span>
+  </h1>
+
+  <p class="subtitle">
+    Hum a melody, speak your lyrics, pick a genre — MemoMuse turns your raw voice memo
+    into a fully produced track with vocals and instrumentation in under a minute.
+  </p>
+
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="document.getElementById('studio').scrollIntoView({behavior:'smooth'})">
+      Start Creating
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    </button>
+    <button class="btn-secondary" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
+      See How It Works
+    </button>
+  </div>
+
+  <div class="hero-visual">
+    <div class="waveform-art" id="heroWave"></div>
+  </div>
+</section>
+
+<!-- GENRES MARQUEE -->
+<section class="genres-section" style="padding:2rem 0;overflow:hidden">
+  <div class="genres-scroll" id="genreMarquee">
+    <span class="genre-tag">Pop</span>
+    <span class="genre-tag">Lo-Fi Hip Hop</span>
+    <span class="genre-tag">Cinematic</span>
+    <span class="genre-tag">R&B</span>
+    <span class="genre-tag">Jazz</span>
+    <span class="genre-tag">Electronic</span>
+    <span class="genre-tag">Indie Folk</span>
+    <span class="genre-tag">Hip Hop</span>
+    <span class="genre-tag">Pop</span>
+    <span class="genre-tag">Lo-Fi Hip Hop</span>
+    <span class="genre-tag">Cinematic</span>
+    <span class="genre-tag">R&B</span>
+    <span class="genre-tag">Jazz</span>
+    <span class="genre-tag">Electronic</span>
+    <span class="genre-tag">Indie Folk</span>
+    <span class="genre-tag">Hip Hop</span>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="section-center">
+  <div class="section-label reveal">How It Works</div>
+  <h2 class="section-title reveal">Four steps. One voice memo.</h2>
+  <p class="section-sub reveal">
+    Our AI pipeline transcribes, analyzes, generates, and mixes — all from a single recording.
+  </p>
+  <div class="how-grid">
+    <div class="how-card reveal">
+      <div class="num">01</div>
+      <h3>Record</h3>
+      <p>Hum a melody, sing rough lyrics, or just talk through your idea. We capture it all.</p>
+      <div class="glow-line"></div>
+    </div>
+    <div class="how-card reveal">
+      <div class="num">02</div>
+      <h3>Transcribe & Analyze</h3>
+      <p>Whisper transcribes your audio. Gemini extracts mood, key, tempo, and clean lyrics.</p>
+      <div class="glow-line"></div>
+    </div>
+    <div class="how-card reveal">
+      <div class="num">03</div>
+      <h3>Generate</h3>
+      <p>Lyria creates the instrumental. ElevenLabs synthesizes studio-quality vocals. In parallel.</p>
+      <div class="glow-line"></div>
+    </div>
+    <div class="how-card reveal">
+      <div class="num">04</div>
+      <h3>Mix & Deliver</h3>
+      <p>Vocals and instrumentals are layered, balanced, and exported as a polished MP3.</p>
+      <div class="glow-line"></div>
+    </div>
+  </div>
+</section>
+
+<!-- STUDIO -->
+<section id="studio">
+  <div class="section-center">
+    <div class="section-label reveal">Studio</div>
+    <h2 class="section-title reveal">Create something amazing.</h2>
+    <p class="section-sub reveal">Pick your genre, hit record, and let the AI do the rest.</p>
+  </div>
+
+  <div style="display:flex;justify-content:center">
+    <div class="studio-card reveal">
+      <!-- Genre Chips -->
+      <div class="genre-grid" id="genreGrid">
+        <button class="genre-chip selected" data-genre="pop">Pop</button>
+        <button class="genre-chip" data-genre="lo-fi hip hop">Lo-Fi</button>
+        <button class="genre-chip" data-genre="hip hop">Hip Hop</button>
+        <button class="genre-chip" data-genre="cinematic">Cinematic</button>
+        <button class="genre-chip" data-genre="r&b">R&B</button>
+        <button class="genre-chip" data-genre="indie folk">Indie Folk</button>
+        <button class="genre-chip" data-genre="electronic">Electronic</button>
+        <button class="genre-chip" data-genre="jazz">Jazz</button>
+      </div>
+
+      <!-- Record -->
+      <div class="record-area">
+        <button class="big-record-btn" id="recordBtn" onclick="toggleRecord()">
+          <svg id="micIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+          <svg id="stopIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+        <div class="record-label" id="recordLabel">Tap to record</div>
+      </div>
+
+      <!-- Live visualizer -->
+      <div class="live-viz" id="liveViz"></div>
+
+      <!-- Generate -->
+      <button class="gen-btn" id="generateBtn" onclick="generate()" disabled>
+        <div class="spinner"></div>
+        <span class="btn-label">Generate Track</span>
+      </button>
+
+      <!-- Pipeline -->
+      <div class="pipeline-steps" id="steps">
+        <div class="pstep" id="ps-transcribe"><span class="pdot"></span>Transcribe</div>
+        <div class="pstep-line"></div>
+        <div class="pstep" id="ps-analyze"><span class="pdot"></span>Analyze</div>
+        <div class="pstep-line"></div>
+        <div class="pstep" id="ps-generate"><span class="pdot"></span>Generate</div>
+        <div class="pstep-line"></div>
+        <div class="pstep" id="ps-mix"><span class="pdot"></span>Mix</div>
+      </div>
+
+      <p class="status-text" id="status">Pick a genre and record your idea.</p>
+
+      <!-- Output -->
+      <div class="output-player" id="playerSection">
+        <div class="output-header">
+          <div class="output-tag">Ready to Play</div>
+        </div>
+        <div class="player-box">
+          <audio id="outputAudio" controls></audio>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section id="tech" class="section-center">
+  <div class="section-label reveal">Built With</div>
+  <h2 class="section-title reveal">Powered by the best in AI</h2>
+  <p class="section-sub reveal">Six services working in harmony to turn your voice into music.</p>
+  <div class="tech-grid">
+    <div class="tech-card reveal">
+      <div class="tech-icon">🧠</div>
+      <div class="tech-name">Google Gemini</div>
+      <div class="tech-role">Lyric & Style Analysis</div>
+    </div>
+    <div class="tech-card reveal">
+      <div class="tech-icon">🎹</div>
+      <div class="tech-name">Google Lyria</div>
+      <div class="tech-role">Instrumental Generation</div>
+    </div>
+    <div class="tech-card reveal">
+      <div class="tech-icon">🎤</div>
+      <div class="tech-name">ElevenLabs</div>
+      <div class="tech-role">Vocal Synthesis</div>
+    </div>
+    <div class="tech-card reveal">
+      <div class="tech-icon">👂</div>
+      <div class="tech-name">OpenAI Whisper</div>
+      <div class="tech-role">Audio Transcription</div>
+    </div>
+    <div class="tech-card reveal">
+      <div class="tech-icon">✍️</div>
+      <div class="tech-name">Featherless AI</div>
+      <div class="tech-role">Lyric Refinement</div>
+    </div>
+    <div class="tech-card reveal">
+      <div class="tech-icon">💾</div>
+      <div class="tech-name">Backboard.io</div>
+      <div class="tech-role">Session Memory</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="f-logo">MemoMuse</div>
+  <p>Built at ListenHacks 2025 — Toronto</p>
+</footer>
+
+<script>
+  // ─── Hero waveform art ───
+  const heroWave = document.getElementById('heroWave');
+  for (let i = 0; i < 60; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.animationDelay = (i * 0.06) + 's';
+    bar.style.animationDuration = (1.2 + Math.random() * 1.2) + 's';
+    heroWave.appendChild(bar);
+  }
+
+  // ─── Live visualizer bars ───
+  const liveViz = document.getElementById('liveViz');
+  for (let i = 0; i < 40; i++) {
+    const b = document.createElement('div');
+    b.className = 'vbar';
+    b.style.animationDelay = (i * 0.04) + 's';
+    b.style.animationDuration = (0.4 + Math.random() * 0.5) + 's';
+    liveViz.appendChild(b);
+  }
+
+  // ─── Scroll reveal ───
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // ─── Genre selection ───
+  let selectedGenre = 'pop';
+  document.querySelectorAll('.genre-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      selectedGenre = chip.dataset.genre;
+    });
+  });
+
+  // ─── Recording ───
+  let mediaRecorder, audioChunks = [], audioBlob = null;
+  const API_URL = window.location.origin;
+  const $ = id => document.getElementById(id);
+
+  async function toggleRecord() {
+    const btn = $('recordBtn');
+    const viz = $('liveViz');
+    const label = $('recordLabel');
+
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      btn.classList.remove('recording');
+      viz.classList.remove('active');
+      $('micIcon').style.display = '';
+      $('stopIcon').style.display = 'none';
+      label.textContent = 'Tap to record';
+      return;
     }
 
-    async function generate(){
-      if(!audioBlob)return;
-      const statusEl=document.getElementById("status"),genBtn=document.getElementById("generateBtn");
-      statusEl.textContent="Generating your track... ⏳ (30-60 seconds)";genBtn.disabled=true;
-      const formData=new FormData();
-      formData.append("audio",audioBlob,"recording.webm");
-      formData.append("genre",document.getElementById("genreSelect").value);
-      try{
-        const response=await fetch(`${API_URL}/generate`,{method:"POST",body:formData});
-        if(!response.ok)throw new Error(`Server error: ${response.status}`);
-        const audioEl=document.getElementById("outputAudio");
-        audioEl.src=URL.createObjectURL(await response.blob());audioEl.style.display="block";audioEl.play();
-        statusEl.textContent="🎉 Your track is ready!";
-      }catch(err){statusEl.textContent="Error generating track.";console.error(err);}
-      genBtn.disabled=false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        $('generateBtn').disabled = false;
+        setStatus('Recording captured — hit Generate!', '');
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      mediaRecorder.start();
+      btn.classList.add('recording');
+      viz.classList.add('active');
+      $('micIcon').style.display = 'none';
+      $('stopIcon').style.display = '';
+      label.textContent = 'Recording...';
+      setStatus('Listening — hum, sing, or speak your idea...', '');
+    } catch (err) {
+      setStatus('Microphone access denied.', 'error');
     }
-  </script>
+  }
+
+  function setStatus(text, type) {
+    const el = $('status');
+    el.textContent = text;
+    el.className = 'status-text' + (type ? ' ' + type : '');
+  }
+
+  const STEPS = ['transcribe', 'analyze', 'generate', 'mix'];
+
+  function showSteps(show) {
+    $('steps').classList.toggle('visible', show);
+  }
+
+  function activateStep(step) {
+    const idx = STEPS.indexOf(step);
+    STEPS.forEach((s, i) => {
+      const el = $('ps-' + s);
+      el.classList.remove('active', 'done');
+      if (i < idx) el.classList.add('done');
+      else if (i === idx) el.classList.add('active');
+    });
+  }
+
+  async function generate() {
+    if (!audioBlob) return;
+    const genBtn = $('generateBtn');
+    genBtn.disabled = true;
+    genBtn.classList.add('loading');
+    $('playerSection').classList.remove('visible');
+
+    showSteps(true);
+    activateStep('transcribe');
+    setStatus('Transcribing your recording...', '');
+
+    const stages = [
+      { step: 'analyze', text: 'Analyzing melody, mood, and lyrics...', delay: 4000 },
+      { step: 'generate', text: 'Generating vocals & instrumentals...', delay: 8000 },
+      { step: 'mix', text: 'Mixing your final track...', delay: 20000 },
+    ];
+
+    let t = 0;
+    const timers = stages.map(s => {
+      t += s.delay;
+      return setTimeout(() => { activateStep(s.step); setStatus(s.text, ''); }, t);
+    });
+
+    const fd = new FormData();
+    fd.append('audio', audioBlob, 'recording.webm');
+    fd.append('genre', selectedGenre);
+
+    try {
+      const res = await fetch(`${API_URL}/generate`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Server ${res.status}`);
+
+      timers.forEach(clearTimeout);
+      STEPS.forEach(s => {
+        $('ps-' + s).classList.remove('active');
+        $('ps-' + s).classList.add('done');
+      });
+
+      const audio = $('outputAudio');
+      audio.src = URL.createObjectURL(await res.blob());
+      $('playerSection').classList.add('visible');
+      audio.play();
+      setStatus('Your track is ready!', 'success');
+    } catch (err) {
+      timers.forEach(clearTimeout);
+      setStatus('Something went wrong — try again.', 'error');
+      showSteps(false);
+      console.error(err);
+    }
+
+    genBtn.disabled = false;
+    genBtn.classList.remove('loading');
+  }
+</script>
 </body>
 </html>
